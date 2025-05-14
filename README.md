@@ -1,1 +1,1 @@
-# Kaluza---WEBAPP
+Projekt iz kolegija Programsko inžinjerstvo
