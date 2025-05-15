@@ -1,72 +1,145 @@
 <template>
-  <q-footer elevated class="bg-primary text-white compact-footer">
-    <div class="row q-px-md q-py-sm"> <!-- Uniformni padding lijevo/desno -->
-      <!-- Logo i opis (lijevo) -->
-      <div class="col-12 col-md-4">
-        <div class="text-subtitle2 q-mb-xs">Tu ide logo</div>
-        <div class="text-footer">Sve što ti i tvoj ljubimac trebate, na jednom mjestu.</div>
-      </div>
+  <q-footer
+    elevated
+    class="bg-primary text-white footer"
+    :class="{ 'footer-visible': isFooterVisible }"
+  >
+    <div class="footer-content">
+      <!-- Desktop layout -->
+      <div class="row gt-sm items-center justify-between q-px-xl q-py-md">
+        <!-- Lijeva kolona - Logo -->
+        <div class="col-3">
+          <div class="text-subtitle2 q-mb-xs">Pets&Care</div>
+          <div class="text-caption">Sve za vašeg ljubimca na jednom mjestu</div>
+        </div>
 
-      <!-- Navigacija (centrirano) -->
-      <div class="col-12 col-md-4 q-mt-sm q-mt-md-none text-center"> <!-- Dodan text-center -->
-        <div class="text-subtitle2 q-mb-xs">Navigacija</div>
-        <div v-for="link in links" :key="link.text">
-          <q-btn flat dense :label="link.text" :to="link.to" class="text-footer" />
+        <!-- Srednja kolona - Navigacija -->
+        <div class="col-6 text-center">
+          <div class="text-subtitle2 q-mb-xs">Navigacija</div>
+          <div class="row justify-center q-gutter-sm">
+            <q-btn
+              v-for="link in links"
+              :key="link.text"
+              flat
+              dense
+              :label="link.text"
+              :to="link.to"
+              class="text-caption"
+            />
+          </div>
+        </div>
+
+        <!-- Desna kolona - Društvene mreže -->
+        <div class="col-3 text-right">
+          <div class="text-subtitle2 q-mb-xs">Pratite nas</div>
+          <div class="row justify-end q-gutter-xs">
+            <q-btn round dense icon="facebook" size="sm" />
+            <q-btn round dense icon="instagram" size="sm" />
+            <q-btn round dense icon="twitter" size="sm" />
+          </div>
         </div>
       </div>
 
-      <!-- Društvene mreže (desno) -->
-      <div class="col-12 col-md-4 q-mt-sm q-mt-md-none text-right"> <!-- Dodan text-right -->
-        <div class="text-subtitle2 q-mb-xs">Društvene mreže</div>
-        <div class="text-footer">
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+      <!-- Mobile layout -->
+      <div class="column lt-md items-center q-pa-md">
+        <div class="text-subtitle2 q-mb-sm">Navigacija</div>
+        <div class="row q-gutter-sm q-mb-sm">
+          <q-btn
+            v-for="link in mobileLinks"
+            :key="link.text"
+            flat
+            dense
+            :label="link.text"
+            :to="link.to"
+            size="sm"
+          />
         </div>
-      </div>
-    </div>
-
-    <!-- Copyright -->
-    <div class="row justify-center q-py-xs bg-dark">
-      <div class="text-footer">
-        © {{ new Date().getFullYear() }} Pets&Care - Sva prava pridržana
+        <div class="text-subtitle2 q-mb-xs">Pratite nas</div>
+        <div class="row q-gutter-sm q-mb-md">
+          <q-btn round dense icon="facebook" size="sm" />
+          <q-btn round dense icon="instagram" size="sm" />
+          <q-btn round dense icon="twitter" size="sm" />
+        </div>
+        <div class="text-caption text-center">
+          © {{ new Date().getFullYear() }} Pets&Care
+        </div>
       </div>
     </div>
   </q-footer>
 </template>
 
-<script>
-export default {
-  data() {
-    return {
-      links: [
-        { text: 'Početna', to: '/' },
-        { text: 'O nama', to: '/about' },
-        { text: 'Događaji', to: '/events' },
-        { text: 'Veterinari', to: '/vets' },
-        { text: 'Kontakt', to: '/contact' }
-      ]
-    }
-  }
-}
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+
+const isFooterVisible = ref(false);
+
+const links = [
+  { text: 'Početna', to: '/' },
+  { text: 'O nama', to: '/about' },
+  { text: 'Događaji', to: '/events' },
+  { text: 'Veterinari', to: '/vets' },
+  { text: 'Kontakt', to: '/contact' }
+];
+
+const mobileLinks = [
+  { text: 'Početna', to: '/' },
+  { text: 'O nama', to: '/about' },
+  { text: 'Kontakt', to: '/contact' }
+];
+
+const checkScroll = () => {
+  const scrollPosition = window.innerHeight + window.scrollY;
+  const documentHeight = document.body.offsetHeight;
+  isFooterVisible.value = scrollPosition >= documentHeight - 50;
+};
+
+onMounted(() => {
+  window.addEventListener('scroll', checkScroll);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', checkScroll);
+});
 </script>
 
 <style scoped>
-.compact-footer {
-  padding: 10px 0 !important;
+.footer-content {
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.text-footer {
-  font-size: 10px !important;
-  line-height: 1 !important;
+.footer {
+  position: fixed;
+  bottom: -100%;
+  left: 0;
+  right: 0;
+  transition: bottom 0.3s ease;
 }
 
+.footer-visible {
+  bottom: 0;
+}
+
+/* Desktop stilovi */
+.q-px-xl {
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
+/* Mobilni stilovi */
+@media (max-width: 1023px) {
+  .q-pa-md {
+    padding: 16px;
+  }
+}
+
+/* Općeniti stilovi */
 .text-subtitle2 {
-  font-size: 14px !important;
-  margin-bottom: 4px !important;
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.col-md-4 {
-  padding-left: 200px !important;
-  padding-right: 200px !important;
-
+.text-caption {
+  font-size: 12px;
 }
 </style>

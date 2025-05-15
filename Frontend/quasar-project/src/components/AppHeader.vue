@@ -20,92 +20,129 @@
         <q-btn flat label="Moj profil" to="/profile" class="text-button" />
       </div>
 
-      <!-- Mobilni meni -->
-      <q-btn flat round dense icon="menu" class="lt-md" @click="toggleLeftDrawer" />
+      <!-- Mobilni meni ikona -->
+      <q-btn
+        flat
+        round
+        dense
+        icon="menu"
+        class="lt-md"
+        @click="toggleLeftDrawer"
+        aria-label="Glavni meni"
+      />
     </q-toolbar>
 
-    <!-- Drawer za mobilni meni -->
-    <q-drawer v-model="leftDrawerOpen" side="left" bordered>
-      <q-list>
-        <q-item clickable v-ripple to="/">
-          <q-item-section>Početna</q-item-section>
-        </q-item>
-        <q-item clickable v-ripple to="/about">
-          <q-item-section>O nama</q-item-section>
-        </q-item>
-        <q-item clickable v-ripple to="/events">
-          <q-item-section>Događaji</q-item-section>
-        </q-item>
-        <q-item clickable v-ripple to="/vets">
-          <q-item-section>Veterinari</q-item-section>
-        </q-item>
-        <q-item clickable v-ripple to="/contact">
-          <q-item-section>Kontakt</q-item-section>
-        </q-item>
-        <q-item clickable v-ripple to="/profile">
-          <q-item-section>Moj profil</q-item-section>
-        </q-item>
-      </q-list>
+    <!-- Mobilni drawer meni -->
+    <q-drawer
+      v-model="leftDrawerOpen"
+      side="left"
+      bordered
+      class="lt-md bg-primary text-white"
+      :width="250"
+    >
+      <q-scroll-area class="fit">
+        <q-list>
+          <q-item-label header class="text-white q-py-md">
+            Navigacija
+          </q-item-label>
+
+          <q-item
+            v-for="link in links"
+            :key="link.to"
+            clickable
+            v-ripple
+            :to="link.to"
+            class="text-white q-my-xs"
+            active-class="active-menu-item"
+            @click="toggleLeftDrawer"
+          >
+            <q-item-section>{{ link.label }}</q-item-section>
+          </q-item>
+        </q-list>
+      </q-scroll-area>
     </q-drawer>
   </q-header>
 </template>
 
-<script>
-import { ref } from 'vue'
+<script setup>
+import { ref } from 'vue';
 
-export default {
-  setup() {
-    const leftDrawerOpen = ref(false)
+const leftDrawerOpen = ref(false);
 
-    return {
-      leftDrawerOpen,
-      toggleLeftDrawer() {
-        leftDrawerOpen.value = !leftDrawerOpen.value
-      }
-    }
-  }
-}
+const links = [
+  { label: 'Početna', to: '/' },
+  { label: 'O nama', to: '/about' },
+  { label: 'Događaji', to: '/events' },
+  { label: 'Veterinari', to: '/vets' },
+  { label: 'Kontakt', to: '/contact' },
+  { label: 'Moj profil', to: '/profile' }
+];
+
+const toggleLeftDrawer = () => {
+  leftDrawerOpen.value = !leftDrawerOpen.value;
+};
 </script>
 
 <style scoped>
 .header-toolbar {
   padding: 0 50px;
   height: 70px;
-  display: flex;
-  justify-content: space-between;
-  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 20px;
+  align-items: center;
 }
 
 .header-left {
-  flex: 1;
-  display: flex;
-  align-items: center;
+  justify-self: start;
 }
 
 .header-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  gap: 12px;
+  justify-self: center;
 }
 
 .header-right {
-  flex: 1;
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  justify-self: end;
 }
 
 .q-btn {
   text-transform: capitalize;
-  min-width: max-content;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  padding: 0 12px;
 }
 
-/* Responsivnost */
+/* Mobilni meni stilovi */
+.q-drawer {
+  background-color: var(--q-primary) !important;
+}
+
+.active-menu-item {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Responsivne prilagodbe */
 @media (max-width: 1023px) {
+  .header-toolbar {
+    padding: 0 20px;
+    grid-template-columns: auto 1fr auto;
+  }
+
   .header-center, .header-right {
     display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .header-toolbar {
+    padding: 0 12px;
+  }
+
+  .header-left span {
+    font-size: 1.25rem;
   }
 }
 </style>

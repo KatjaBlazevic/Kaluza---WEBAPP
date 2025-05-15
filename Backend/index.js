@@ -1,0 +1,371 @@
+// app.js (ili index.js)
+const express = require('express');
+const mysql = require('mysql2');
+const cors = require('cors');
+
+const app = express();
+app.use(express.json());
+app.use(cors());
+
+const db = mysql.createConnection({
+  host: 'ucka.veleri.hr',
+  user: 'kblazevic',
+  password: '11',
+  database: 'kblazevic'
+});
+
+db.connect(err => {
+  if (err) throw err;
+  console.log('Povezano s bazom podataka.');
+});
+
+// ===== CRUD ZA SVE TABLICE =====
+
+// 1. Korisnik
+app.get('/korisnici', (req, res) => {
+  db.query('SELECT * FROM Korisnik', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/korisnici', (req, res) => {
+  db.query('INSERT INTO Korisnik SET ?', req.body, (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.status(201).json({ message: 'Korisnik dodan', id: result.insertId });
+  });
+});
+
+app.put('/korisnici/:id', (req, res) => {
+  db.query('UPDATE Korisnik SET ? WHERE SIFRA_KORISNIK = ?', [req.body, req.params.id], err => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Korisnik ažuriran' });
+  });
+});
+
+app.delete('/korisnici/:id', (req, res) => {
+  db.query('DELETE FROM Korisnik WHERE SIFRA_KORISNIK = ?', req.params.id, err => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Korisnik obrisan' });
+  });
+});
+
+// 2. Ljubimac
+app.get('/ljubimci', (req, res) => {
+  db.query('SELECT * FROM Ljubimac', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/ljubimci', (req, res) => {
+  db.query('INSERT INTO Ljubimac SET ?', req.body, (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.status(201).json({ message: 'Ljubimac dodan', id: result.insertId });
+  });
+});
+
+app.put('/ljubimci/:id', (req, res) => {
+  db.query('UPDATE Ljubimac SET ? WHERE SIFRA_LJUBIMAC = ?', [req.body, req.params.id], err => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Ljubimac ažuriran' });
+  });
+});
+
+app.delete('/ljubimci/:id', (req, res) => {
+  db.query('DELETE FROM Ljubimac WHERE SIFRA_LJUBIMAC = ?', req.params.id, err => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Ljubimac obrisan' });
+  });
+});
+
+// 3. Veterinar
+app.get('/veterinari', (req, res) => {
+  db.query('SELECT * FROM Veterinar', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/veterinari', (req, res) => {
+  db.query('INSERT INTO Veterinar SET ?', req.body, (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Veterinar dodan', id: result.insertId });
+  });
+});
+
+app.put('/veterinari/:id', (req, res) => {
+  db.query('UPDATE Veterinar SET ? WHERE SIFRA_VETERINARA = ?', [req.body, req.params.id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Veterinar ažuriran' });
+  });
+});
+
+app.delete('/veterinari/:id', (req, res) => {
+  db.query('DELETE FROM Veterinar WHERE SIFRA_VETERINARA = ?', req.params.id, (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Veterinar obrisan' });
+  });
+});
+
+// 4. Dogadaj
+app.get('/dogadaji', (req, res) => {
+  db.query('SELECT * FROM Dogadaj', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/dogadaji', (req, res) => {
+  db.query('INSERT INTO Dogadaj SET ?', req.body, (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Dogadaj dodan', id: result.insertId });
+  });
+});
+
+app.put('/dogadaji/:id', (req, res) => {
+  db.query('UPDATE Dogadaj SET ? WHERE SIFRA_DOGADAJA = ?', [req.body, req.params.id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Dogadaj ažuriran' });
+  });
+});
+
+app.delete('/dogadaji/:id', (req, res) => {
+  db.query('DELETE FROM Dogadaj WHERE SIFRA_DOGADAJA = ?', req.params.id, (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Dogadaj obrisan' });
+  });
+});
+
+// 5. Podsjetnik
+app.get('/podsjetnici', (req, res) => {
+  db.query('SELECT * FROM Podsjetnik', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/podsjetnici', (req, res) => {
+  db.query('INSERT INTO Podsjetnik SET ?', req.body, (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Podsjetnik dodan', id: result.insertId });
+  });
+});
+
+app.put('/podsjetnici/:id', (req, res) => {
+  db.query('UPDATE Podsjetnik SET ? WHERE SIFRA_PODSJETNIKA = ?', [req.body, req.params.id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Podsjetnik ažuriran' });
+  });
+});
+
+app.delete('/podsjetnici/:id', (req, res) => {
+  db.query('DELETE FROM Podsjetnik WHERE SIFRA_PODSJETNIKA = ?', req.params.id, (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Podsjetnik obrisan' });
+  });
+});
+
+// 6. Administrator
+app.get('/administratori', (req, res) => {
+  db.query('SELECT * FROM Administrator', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/administratori', (req, res) => {
+  const data = req.body;
+  db.query('INSERT INTO Administrator SET ?', data, (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Administrator dodan', id: results.insertId });
+  });
+});
+
+app.put('/administratori/:id', (req, res) => {
+  const id = req.params.id;
+  const data = req.body;
+  db.query('UPDATE Administrator SET ? WHERE SIFRA_ADMINISTRATORA = ?', [data, id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Administrator ažuriran' });
+  });
+});
+
+app.delete('/administratori/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('DELETE FROM Administrator WHERE SIFRA_ADMINISTRATORA = ?', id, (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Administrator obrisan' });
+  });
+});
+
+// 7. Dokument
+app.get('/dokumenti', (req, res) => {
+  db.query('SELECT * FROM Dokument', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/dokumenti', (req, res) => {
+  const data = req.body;
+  db.query('INSERT INTO Dokument SET ?', data, (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Dokument dodan', id: results.insertId });
+  });
+});
+
+app.put('/dokumenti/:id', (req, res) => {
+  const id = req.params.id;
+  const data = req.body;
+  db.query('UPDATE Dokument SET ? WHERE SIFRA_DOKUMENTA = ?', [data, id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Dokument ažuriran' });
+  });
+});
+
+app.delete('/dokumenti/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('DELETE FROM Dokument WHERE SIFRA_DOKUMENTA = ?', id, (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Dokument obrisan' });
+  });
+});
+
+// 8. Dnevnik
+app.get('/dnevnici', (req, res) => {
+  db.query('SELECT * FROM Dnevnik', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/dnevnici', (req, res) => {
+  const data = req.body;
+  db.query('INSERT INTO Dnevnik SET ?', data, (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Dnevnik dodan', id: results.insertId });
+  });
+});
+
+app.put('/dnevnici/:id', (req, res) => {
+  const id = req.params.id;
+  const data = req.body;
+  db.query('UPDATE Dnevnik SET ? WHERE SIFRA_DNEVNIKA = ?', [data, id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Dnevnik ažuriran' });
+  });
+});
+
+app.delete('/dnevnici/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('DELETE FROM Dnevnik WHERE SIFRA_DNEVNIKA = ?', id, (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Dnevnik obrisan' });
+  });
+});
+
+// 9. Slike
+app.get('/slike', (req, res) => {
+  db.query('SELECT * FROM Slike', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/slike', (req, res) => {
+  const data = req.body;
+  db.query('INSERT INTO Slike SET ?', data, (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Slika dodana', id: results.insertId });
+  });
+});
+
+app.put('/slike/:id', (req, res) => {
+  const id = req.params.id;
+  const data = req.body;
+  db.query('UPDATE Slike SET ? WHERE SIFRA_SLIKE = ?', [data, id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Slika ažurirana' });
+  });
+});
+
+app.delete('/slike/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('DELETE FROM Slike WHERE SIFRA_SLIKE = ?', id, (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Slika obrisana' });
+  });
+});
+
+// 10. Tretman
+app.get('/tretmani', (req, res) => {
+  db.query('SELECT * FROM Tretman', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/tretmani', (req, res) => {
+  const data = req.body;
+  db.query('INSERT INTO Tretman SET ?', data, (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Tretman dodan', id: results.insertId });
+  });
+});
+
+app.put('/tretmani/:id', (req, res) => {
+  const id = req.params.id;
+  const data = req.body;
+  db.query('UPDATE Tretman SET ? WHERE SIFRA_TRETMANA = ?', [data, id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Tretman ažuriran' });
+  });
+});
+
+app.delete('/tretmani/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('DELETE FROM Tretman WHERE SIFRA_TRETMANA = ?', id, (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Tretman obrisan' });
+  });
+});
+
+// 11. Termin
+app.get('/termini', (req, res) => {
+  db.query('SELECT * FROM Termin', (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+app.post('/termini', (req, res) => {
+  const data = req.body;
+  db.query('INSERT INTO Termin SET ?', data, (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.status(201).json({ message: 'Termin dodan', id: result.insertId });
+  });
+});
+
+app.put('/termini/:id', (req, res) => {
+  const id = req.params.id;
+  const data = req.body;
+  db.query('UPDATE Termin SET ? WHERE SIFRA_TERMINA = ?', [data, id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Termin ažuriran' });
+  });
+});
+
+app.delete('/termini/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('DELETE FROM Termin WHERE SIFRA_TERMINA = ?', id, (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: 'Termin obrisan' });
+  });
+});
+
+// Pokretanje servera
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Server radi na portu " + PORT);
+});

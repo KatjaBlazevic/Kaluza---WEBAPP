@@ -3,12 +3,30 @@ const routes = [
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
     children: [
-      { path: '', component: () => import('pages/IndexPage.vue') }
+      // Početna stranica
+      { path: '', component: () => import('pages/IndexPage.vue') },
+
+      // O nama
+      { path: 'about', component: () => import('pages/ONamaPage.vue') },
+
+      // Dogadaji
+      { path: 'events', component: () => import('pages/DogadajiPage.vue') },
+
+      // Veterinari
+      { path: 'vets', component: () => import('pages/VeterinariPage.vue') },
+
+      // Kontakt
+      { path: 'contact', component: () => import('pages/KontaktPage.vue') },
+
+      // Profil
+      { path: 'profile', component: () => import('pages/ProfilPage.vue') },
+
+      // Registracija
+      { path: 'register', component: () => import('pages/RegistracijaPage.vue') }
     ]
   },
 
-  // Always leave this as last one,
-  // but you can also remove it
+  // Error 404
   {
     path: '/:catchAll(.*)*',
     component: () => import('pages/ErrorNotFound.vue')
