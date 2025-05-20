@@ -100,13 +100,16 @@
 }
 
 .hero-section {
-  height: 90vh;
-  min-height: 500px;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)),
-              url('hero_pocetna.avif');
+  height: 70vh;
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)),url('hero_pocetna.avif');
   background-size: cover;
   background-position: center;
-  background-repeat: no-repeat;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin-bottom: 3rem;
 }
 
 .hero-title {

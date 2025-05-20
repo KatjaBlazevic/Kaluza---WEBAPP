@@ -4,7 +4,7 @@
       <div class="hero-content text-center">
         <h1 class="hero-title">Upoznaj Pets&Care</h1>
         <p class="hero-subtitle">
-          Stratsveno gradimo zajednicu za ljubimce i njihove vlasnike
+          Strastveno gradimo zajednicu za ljubimce i njihove vlasnike
         </p>
       </div>
     </div>
@@ -67,9 +67,8 @@
 
 /* Hero sekcija */
 .hero-section {
-  height: 84vh;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)),
-              url('hero_onama.png');
+  height: 70vh;
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)), url('hero_onama.png');
   background-size: cover;
   background-position: center;
   color: white;

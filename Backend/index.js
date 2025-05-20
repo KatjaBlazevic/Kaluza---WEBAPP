@@ -1,12 +1,19 @@
-// app.js (ili index.js)
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
+const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
 
+// CORS: dopušta pristup s tvoje Quasar domene
+app.use(cors({
+  origin: 'http://localhost:9000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: false
+}));
+
+// Povezivanje s bazom
 const db = mysql.createConnection({
   host: 'ucka.veleri.hr',
   user: 'kblazevic',
@@ -19,7 +26,58 @@ db.connect(err => {
   console.log('Povezano s bazom podataka.');
 });
 
-// ===== CRUD ZA SVE TABLICE =====
+// ==== SENDMAIL ENDPOINT ====
+
+app.post('/sendmail', async (req, res) => {
+  const { ime, email, poruka } = req.body;
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'katjablaz55@gmail.com', 
+      pass: 'fiwj fkgl ipeh hcqr'
+    }
+  });
+
+  const mailOptions = {
+    from: email,
+    to: 'katjablaz55@gmail.com',
+    subject: `Poruka s kontakt forme`,
+    text: `Ime: ${ime}\nEmail: ${email}\nPoruka:\n${poruka}`
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    res.status(200).send({ message: 'Poruka je poslana.' });
+  } catch (error) {
+    console.error('Greška pri slanju maila:', error);
+    res.status(500).send({ message: 'Greška pri slanju poruke.' });
+  }
+});
+// Registracija
+app.post('/registracija', (req, res) => {
+  const { ime, prezime, email, lozinka } = req.body;
+
+  const provjeriEmailQuery = 'SELECT * FROM Korisnik WHERE email_korisnika = ?';
+  db.query(provjeriEmailQuery, [email], (err, result) => {
+    if (err) return res.status(500).json({ message: 'Greška u provjeri emaila.' });
+
+    if (result.length > 0) {
+      return res.status(400).json({ message: 'Email već postoji.' });
+    }
+
+    const insertQuery = `
+      INSERT INTO Korisnik (ime_korisnika, prezime_korisnika, email_korisnika, lozinka_korisnika)
+      VALUES (?, ?, ?, ?)
+    `;
+    db.query(insertQuery, [ime, prezime, email, lozinka], (err, result) => {
+      if (err) return res.status(500).json({ message: 'Greška prilikom registracije.' });
+      return res.status(200).json({ message: 'Registracija uspješna.', sifra_korisnika: result.insertId });
+    });
+  });
+});
+
+// ==== CRUD OPERACIJE ZA SVE TABLICE U BAZI ====
 
 // 1. Korisnik
 app.get('/korisnici', (req, res) => {
@@ -110,7 +168,20 @@ app.delete('/veterinari/:id', (req, res) => {
 
 // 4. Dogadaj
 app.get('/dogadaji', (req, res) => {
-  db.query('SELECT * FROM Dogadaj', (err, results) => {
+  const query = `
+    SELECT 
+      naziv_dogadaja,
+      vrsta_dogadaja,
+      opis_dogadaja,
+      grad,
+      adresa,
+      DATE_FORMAT(datum_dogadaja, '%Y-%m-%d') AS datum_dogadaja,
+      TIME_FORMAT(vrijeme_dogadaja, '%H:%i') AS vrijeme_dogadaja,
+      SIFRA_DOGADAJA
+    FROM Dogadaj
+  `;
+
+  db.query(query, (err, results) => {
     if (err) return res.status(500).json(err);
     res.json(results);
   });
