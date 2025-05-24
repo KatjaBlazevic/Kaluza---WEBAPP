@@ -25,7 +25,8 @@ module.exports = configure(function (/* ctx */) {
     boot: [
       'i18n',
       'axios',
-      'google-maps'
+      'google-maps',
+      'pinia'
     ],
 
     css: [
@@ -53,7 +54,10 @@ module.exports = configure(function (/* ctx */) {
             lintCommand: 'eslint "./**/*.{js,mjs,cjs,vue}"'
           }
         }, { server: false }]
-      ]
+      ],
+      alias: {
+        '@': path.resolve(__dirname, './src')
+      }
     },
 
     devServer: {

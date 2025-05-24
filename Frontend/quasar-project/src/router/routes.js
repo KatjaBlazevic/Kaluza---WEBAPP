@@ -18,11 +18,29 @@ const routes = [
       // Kontakt
       { path: 'contact', component: () => import('pages/KontaktPage.vue') },
 
-      // Profil
-      { path: 'profile', component: () => import('pages/ProfilPage.vue') },
+      // Registracija (prva faza registracije)
+      { path: 'register', component: () => import('pages/RegistracijaPage.vue') },
 
-      // Registracija
-      { path: 'register', component: () => import('pages/RegistracijaPage.vue') }
+      // Izrada profila (druga faza registracije)
+      { path: 'izrada-profila', component: () => import('pages/IzradaProfilaPage.vue') },
+
+      //Izrada profila ljubimca (treća faza registracije)
+      { path: 'dodaj-ljubimca', component: () => import('pages/DodajLjubimcaPage.vue') },
+
+      // Prijava
+      { path: 'prijava', component: () => import('pages/PrijavaPage.vue') },
+
+      //Profil
+      { path: 'profile', component: () => import('pages/ProfilPage.vue'), meta: { requiresAuth: true } },
+
+      //Uredi profil
+      { path: 'uredi-profil', component: () => import('pages/UrediProfilPage.vue'), meta: { requiresAuth: true } },
+
+      //Pregled ljubimca
+      { path: 'pregled-ljubimaca', component: () => import('pages/PregledLjubimacaPage.vue'), meta: { requiresAuth: true } },
+
+      //Uredu ljubimca
+      { path: 'uredi-ljubimca/:id', component: () => import('pages/UrediLjubimcaPage.vue'), meta: { requiresAuth: true } },
     ]
   },
 

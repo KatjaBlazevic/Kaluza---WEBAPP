@@ -1,30 +1,43 @@
-import { route } from 'quasar/wrappers'
-import { createRouter, createMemoryHistory, createWebHistory, createWebHashHistory } from 'vue-router'
-import routes from './routes'
+import { createRouter, createWebHistory } from 'vue-router';
+import routes from './routes';
 
-/*
- * If not building with SSR mode, you can
- * directly export the Router instantiation;
- *
- * The function below can be async too; either use
- * async/await or return a Promise which resolves
- * with the Router instance.
- */
+// Funkcija za provjeru prijave (koristi /api/check-session rutu)
+async function isAuthenticated() {
+  try {
+    const res = await fetch('http://localhost:3000/api/check-session', {
+      credentials: 'include' // Ključno za slanje cookieja sesije
+    });
+    const data = await res.json();
+    return data.authenticated === true;
+  } catch (err) {
+    console.error('Greška pri provjeri autentičnosti:', err); // Dodaj log za debugging
+    return false;
+  }
+}
 
-export default route(function (/* { store, ssrContext } */) {
-  const createHistory = process.env.SERVER
-    ? createMemoryHistory
-    : (process.env.VUE_ROUTER_MODE === 'history' ? createWebHistory : createWebHashHistory)
-
+// KLJUČNO: Exportira se FUNKCIJA koja vraća instancu routera
+export default function (/* { store, ssrContext } */) {
   const Router = createRouter({
     scrollBehavior: () => ({ left: 0, top: 0 }),
     routes,
+    // Koristi createWebHistory s process.env.VUE_ROUTER_BASE za ispravan rad u Quasaru
+    history: createWebHistory(process.env.VUE_ROUTER_BASE)
+  });
 
-    // Leave this as is and make changes in quasar.conf.js instead!
-    // quasar.conf.js -> build -> vueRouterMode
-    // quasar.conf.js -> build -> publicPath
-    history: createHistory(process.env.VUE_ROUTER_BASE)
-  })
+  // Global Navigation Guard
+  Router.beforeEach(async (to, from, next) => {
+    if (to.meta.requiresAuth) {
+      const auth = await isAuthenticated();
+      if (auth) {
+        next();
+      } else {
+        // console.log('Korisnik nije prijavljen, preusmjeravanje na prijavu.'); // Debugging
+        next('/prijava'); // Preusmjeri na stranicu za prijavu ako nije autentificiran
+      }
+    } else {
+      next(); // Nastavi normalno ako ruta ne zahtijeva autentifikaciju
+    }
+  });
 
-  return Router
-})
+  return Router; // Vrati instancu routera
+}

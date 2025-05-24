@@ -1,39 +1,60 @@
 <template>
-  <q-page class="q-pa-xl">
-    <div class="q-mx-auto" style="max-width: 500px">
-      <h2 class="text-h4 text-center q-mb-md">Registracija</h2>
-      <q-form @submit.prevent="submitRegistration" class="q-gutter-md">
-        <q-input v-model="ime" label="Ime" outlined required />
-        <q-input v-model="prezime" label="Prezime" outlined required />
-        <q-input v-model="email" label="Email" type="email" outlined required />
-        <q-input v-model="lozinka" label="Lozinka" type="password" outlined required />
-        <q-btn type="submit" label="Registriraj se" color="primary" :loading="loading" />
+  <q-page class="q-pa-lg">
+    <q-card class="q-pa-md q-mx-auto" style="max-width: 500px">
+      <q-card-section>
+        <div class="text-h4 registracija-title">Registracija</div>
+      </q-card-section>
+
+      <q-form @submit.prevent="submitRegistration">
+        <q-card-section class="q-gutter-md">
+          <q-input v-model="ime" label="Ime" filled required />
+          <q-input v-model="prezime" label="Prezime" filled required />
+          <q-input v-model="email" label="Email" type="email" filled required />
+          <q-input v-model="lozinka" label="Lozinka" type="password" filled required />
+        </q-card-section>
+
+        <q-card-actions align="center">
+          <q-btn type="submit" label="Registriraj se" color="primary" :loading="loading" />
+        </q-card-actions>
       </q-form>
 
-      <q-btn flat label="Registriraj se putem Googlea" class="q-mt-md" icon="google" color="red" />
+      <q-card-section v-if="successMsg || errorMsg" class="text-center">
+        <div
+          :class="{
+            'text-positive': successMsg,
+            'text-negative': errorMsg
+          }"
+          class="text-subtitle2 q-mt-md"
+        >
+          {{ successMsg || errorMsg }}
+        </div>
+      </q-card-section>
 
-      <div class="text-center q-mt-md">
+      <q-card-section class="text-center">
         Već imaš račun?
         <router-link to="/prijava" class="text-primary">Prijavi se</router-link>
-      </div>
-
-      <div v-if="successMsg" class="text-positive q-mt-md">{{ successMsg }}</div>
-      <div v-if="errorMsg" class="text-negative q-mt-md">{{ errorMsg }}</div>
-    </div>
+      </q-card-section>
+    </q-card>
   </q-page>
 </template>
 
+
 <script setup>
-import { ref } from 'vue';
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user';
+const userStore = useUserStore();
 
-const ime = ref('');
-const prezime = ref('');
-const email = ref('');
-const lozinka = ref('');
+const ime = ref('')
+const prezime = ref('')
+const email = ref('')
+const lozinka = ref('')
 
-const loading = ref(false);
-const successMsg = ref('');
-const errorMsg = ref('');
+const loading = ref(false)
+const successMsg = ref('')
+const errorMsg = ref('')
+
+const router = useRouter()
 
 const submitRegistration = async () => {
   loading.value = true;
@@ -44,6 +65,7 @@ const submitRegistration = async () => {
     const res = await fetch('http://localhost:3000/registracija', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // Omogućava primanje sesije
       body: JSON.stringify({
         ime: ime.value,
         prezime: prezime.value,
@@ -59,10 +81,12 @@ const submitRegistration = async () => {
     }
 
     successMsg.value = data.message;
-    ime.value = '';
-    prezime.value = '';
-    email.value = '';
-    lozinka.value = '';
+
+    // Pohrani korisnika u store ako koristiš Pinia/Vuex (opcionalno)
+    userStore.setUser(data.user);
+
+    // Automatski preusmjeri korisnika na izradu profila
+    router.push({ path: '/izrada-profila', query: { email: email.value } });
   } catch (err) {
     errorMsg.value = err.message;
   } finally {
@@ -70,3 +94,11 @@ const submitRegistration = async () => {
   }
 };
 </script>
+
+<style scoped>
+.registracija-title {
+  color: var(--q-primary);
+  font-weight: bold;
+  text-align: center;
+}
+</style>
