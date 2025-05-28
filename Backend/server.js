@@ -4,9 +4,15 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
+const multer = require('multer');
 
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+const PORT = process.env.PORT || 3000;
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // CORS
 app.use(cors({
@@ -37,8 +43,11 @@ const db = mysql.createConnection({
 });
 
 db.connect(err => {
-  if (err) throw err;
-  console.log('Povezano s bazom podataka.');
+  if (err) {
+    console.error('Greška prilikom povezivanja s bazom:', err);
+  } else {
+    console.log('Povezano s bazom podataka.');
+  }
 });
 
 // Middleware za autentikaciju
@@ -53,6 +62,7 @@ function authenticateSession(req, res, next) {
 // REGISTRACIJA (1. KORAK REGISTRACIJE)
 app.post('/registracija', (req, res) => {
   const { ime, prezime, email, lozinka } = req.body;
+  console.log('Primljeno u /registracija:', req.body);
 
   if (!ime || !prezime || !email || !lozinka) {
     return res.status(400).json({ message: 'Sva polja su obavezna.' });
@@ -202,7 +212,7 @@ app.get('/api/check-session', (req, res) => {
   }
 });
 
-//DOHVAĆANJ PROFILA
+//DOHVAĆANJE PROFILA
 app.get('/profile', authenticateSession, (req, res) => {
   if (!req.session.user) {
     return res.status(401).json({ message: 'Korisnik nije prijavljen.' });
@@ -224,64 +234,24 @@ app.get('/profile', authenticateSession, (req, res) => {
 //AŽURIRANJE PROFILA
 app.put('/update-profile', (req, res) => {
   const korisnikId = req.session?.user?.id;
+  if (!korisnikId) return res.status(401).json({ error: "Korisnik nije prijavljen." });
 
-  if (!korisnikId) {
-    return res.status(401).json({ error: "Korisnik nije prijavljen." });
-  }
+  const fieldsToUpdate = { ime_korisnika: req.body.ime, prezime_korisnika: req.body.prezime, email_korisnika: req.body.email };
+  const updates = Object.entries(fieldsToUpdate).filter(([_, value]) => value);
 
-  const allowedFields = {
-    nadimak_korisnika: req.body.nadimak,
-    adresa_korisnika: req.body.adresa,
-    mjesto_stanovanja: req.body.mjesto,
-    datum_rodenja: req.body.datumRodenja,
-    broj_telefona_korisnika: req.body.brojTelefona,
-    ime_korisnika: req.body.ime,
-    prezime_korisnika: req.body.prezime,
-    email_korisnika: req.body.email,
-    lozinka_korisnika: req.body.lozinka
-  };
+  if (!updates.length) return res.status(400).json({ error: "Nema podataka za ažuriranje." });
 
-  // Filtriraj samo one koji nisu undefined ili prazni stringovi
-  const fieldsToUpdate = Object.entries(allowedFields).filter(([_, value]) => value !== undefined && value !== '');
+  const sqlUpdate = `UPDATE Korisnik SET ${updates.map(([key]) => `${key} = ?`).join(', ')} WHERE SIFRA_KORISNIKA = ?`;
+  db.query(sqlUpdate, [...updates.map(([_, value]) => value), korisnikId], (err, result) => {
+    if (err) return res.status(500).json({ error: 'Greška prilikom ažuriranja profila' });
 
-  if (fieldsToUpdate.length === 0) {
-    return res.status(400).json({ error: "Nema podataka za ažuriranje." });
-  }
-
-  const setClause = fieldsToUpdate.map(([key]) => `${key} = ?`).join(', ');
-  const values = fieldsToUpdate.map(([_, value]) => value);
-
-  const sqlUpdate = `UPDATE Korisnik SET ${setClause} WHERE SIFRA_KORISNIKA = ?`;
-
-  values.push(korisnikId);
-
-  db.query(sqlUpdate, values, (err, result) => {
-    if (err) {
-      console.error('Greška prilikom ažuriranja korisnika:', err);
-      return res.status(500).json({ error: 'Greška prilikom ažuriranja profila' });
-    }
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Korisnik nije pronađen.' });
-    }
-
-    // Nakon updatea, dohvati nove podatke korisnika i pošalji ih u odgovoru
-    const sqlSelect = `SELECT ime_korisnika AS ime, prezime_korisnika AS prezime, email_korisnika AS email, nadimak_korisnika AS nadimak, adresa_korisnika AS adresa, mjesto_stanovanja AS mjesto, datum_rodenja, broj_telefona_korisnika AS brojTelefona FROM Korisnik WHERE SIFRA_KORISNIKA = ?`;
-
-    db.query(sqlSelect, [korisnikId], (err2, rows) => {
-      if (err2) {
-        console.error('Greška prilikom dohvata korisnika nakon updatea:', err2);
-        return res.status(500).json({ error: 'Greška prilikom dohvata podataka nakon ažuriranja' });
-      }
-
-      if (rows.length === 0) {
-        return res.status(404).json({ error: 'Korisnik nije pronađen nakon ažuriranja.' });
-      }
-
+    db.query(`SELECT ime_korisnika AS ime, prezime_korisnika AS prezime FROM Korisnik WHERE SIFRA_KORISNIKA = ?`, [korisnikId], (err2, rows) => {
+      if (err2) return res.status(500).json({ error: 'Greška prilikom dohvata podataka' });
       res.json({ message: 'Profil uspješno ažuriran', user: rows[0] });
     });
   });
 });
+
 
 // DOHVATI LJUBIMCE KORISNIKA
 app.get('/moji-ljubimci', (req, res) => {
@@ -333,7 +303,7 @@ app.put('/uredi-ljubimca/:id', (req, res) => {
       podaci_o_prehrani_ljubimca: podaci_o_prehrani_ljubimca || ljubimac.podaci_o_prehrani_ljubimca
     };
 
-    // žuriraj samo ono što je promijenjeno
+    // Ažuriraj samo ono što je promijenjeno
     const updateSql = `
       UPDATE Ljubimac 
       SET ime_ljubimca = ?, vrsta_ljubimca = ?, datum_rodenja_ljubimca = ?, kilaza_ljubimca = ?, podaci_o_njezi_ljubimca = ?, podaci_o_prehrani_ljubimca = ?
@@ -372,6 +342,148 @@ app.delete('/obrisi-ljubimca/:id', (req, res) => {
     }
 
     res.json({ poruka: '✅ Ljubimac uspješno obrisan.' });
+  });
+});
+
+//DOHVAĆANJE SLIKA IZ BAZE
+app.get('/galerija', (req, res) => {
+  if (!req.session.user || !req.session.user.SIFRA_KORISNIKA) {
+    return res.status(401).json({ poruka: '❌ Korisnik nije prijavljen.' });
+  }
+
+  const sql = `
+    SELECT SIFRA_SLIKE, naziv_slike, opis_slike, DATE_FORMAT(datum_objave, '%d.%m.%Y.') AS datum_objave, slika
+    FROM Slike
+    WHERE SIFRA_KORISNIKA = ? 
+    ORDER BY datum_objave DESC
+  `;
+
+  db.query(sql, [req.session.user.SIFRA_KORISNIKA], (err, results) => {
+    if (err) {
+      console.error('❌ Greška pri dohvaćanju galerije:', err);
+      return res.status(500).json({ poruka: '❌ Greška na serveru.', detalji: err.message });
+    }
+
+    res.json(results.map(slika => ({
+      SIFRA_SLIKE: slika.SIFRA_SLIKE,
+      naziv_slike: slika.naziv_slike,
+      opis_slike: slika.opis_slike,
+      datum_objave: slika.datum_objave, // Sada je formatiran na backendu
+      slika: slika.slika ? `data:image/jpeg;base64,${Buffer.from(slika.slika).toString('base64')}` : null
+    })));
+  });
+});
+
+
+//DODAVANJE SLIKA U BAZU
+app.post('/dodaj-sliku', upload.single('slika'), async (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ poruka: '❌ Korisnik nije prijavljen.' });
+  }
+
+  // 🎯 Osiguravamo ispravan naziv `SIFRA_KORISNIKA`
+  req.session.user.SIFRA_KORISNIKA = req.session.user.id;
+
+  const { naziv_slike, opis_slike } = req.body;
+  const slikaBuffer = req.file.buffer;
+
+  // ✅ Formatiranje datuma u `DD.MM.YYYY.` direktno u SQL upitu
+  const sql = `
+    INSERT INTO Slike (SIFRA_KORISNIKA, slika, naziv_slike, opis_slike, datum_objave) 
+    VALUES (?, ?, ?, ?, CURDATE())
+  `;
+
+  db.query(sql, [req.session.user.SIFRA_KORISNIKA, slikaBuffer, naziv_slike, opis_slike], (err, result) => {
+    if (err) {
+      console.error('❌ Greška pri dodavanju slike:', err);
+      return res.status(500).json({ poruka: '❌ Greška na serveru.', detalji: err.message });
+    }
+
+    res.json({ poruka: '✅ Slika uspješno dodana!', SIFRA_SLIKE: result.insertId });
+  });
+});
+
+//PREGLED POJEDINACNE SLIKE
+app.get('/slika/:SIFRA_SLIKE', (req, res) => {
+  const slikaId = req.params.SIFRA_SLIKE;
+
+  const sql = `
+    SELECT SIFRA_SLIKE, naziv_slike, opis_slike, DATE_FORMAT(datum_objave, '%d.%m.%Y.') AS datum_objave, slika
+    FROM Slike
+    WHERE SIFRA_SLIKE = ? 
+  `;
+
+  db.query(sql, [slikaId], (err, results) => {
+    if (err) {
+      console.error('Greška pri dohvaćanju slike:', err);
+      return res.status(500).json({ poruka: 'Greška na serveru.', detalji: err.message });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ poruka: 'Slika nije pronađena.' });
+    }
+
+    const slika = results[0].slika 
+      ? `data:image/jpeg;base64,${Buffer.from(results[0].slika).toString('base64')}` 
+      : null;
+
+    res.json({
+      SIFRA_SLIKE: results[0].SIFRA_SLIKE,
+      naziv_slike: results[0].naziv_slike,
+      opis_slike: results[0].opis_slike,
+      datum_objave: results[0].datum_objave,
+      slika
+    });
+  });
+});
+
+//UREDIVANJE SLIKE
+app.put('/slika/:SIFRA_SLIKE', (req, res) => {
+  const slikaId = req.params.SIFRA_SLIKE;
+  const { naziv_slike, opis_slike } = req.body; // Datum NE šaljemo!
+
+  let sql = 'UPDATE Slike SET ';
+  const fields = [];
+  const values = [];
+
+  if (naziv_slike) {
+    fields.push('naziv_slike = ?');
+    values.push(naziv_slike);
+  }
+  if (opis_slike) {
+    fields.push('opis_slike = ?');
+    values.push(opis_slike);
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).json({ poruka: '❌ Nema podataka za ažuriranje.' });
+  }
+
+  sql += fields.join(', ') + ' WHERE SIFRA_SLIKE = ?';
+  values.push(slikaId);
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('❌ Greška pri ažuriranju slike:', err);
+      return res.status(500).json({ poruka: '❌ Greška na serveru.', detalji: err.message });
+    }
+
+    res.json({ poruka: '✅ Slika uspješno ažurirana!' });
+  });
+}); 
+
+//BRISANJE SLIKE  
+app.delete('/slika/:SIFRA_SLIKE', (req, res) => {
+  const slikaId = req.params.SIFRA_SLIKE;
+
+  const sql = 'DELETE FROM Slike WHERE SIFRA_SLIKE = ?';
+  db.query(sql, [slikaId], (err, result) => {
+    if (err) {
+      console.error('❌ Greška pri brisanju slike:', err);
+      return res.status(500).json({ poruka: '❌ Greška na serveru.', detalji: err.message });
+    }
+
+    res.json({ poruka: '🗑️ Slika uspješno obrisana!' });
   });
 });
 
@@ -451,7 +563,32 @@ app.get('/veterinari', (req, res) => {
 });
 
 // Pokretanje servera
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("Server radi na portu " + PORT);
-});
+
+let server;
+
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log("Server radi na portu " + PORT);
+  });
+}
+
+function closeServer() {
+  return new Promise((resolve, reject) => {
+    if (server) {
+      server.close(err => {
+        if (err) return reject(err);
+
+        // Zatvaranje konekcije prema bazi
+        db.end(err => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
+module.exports = { app, closeServer };
+

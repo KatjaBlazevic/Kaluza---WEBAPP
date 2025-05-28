@@ -5,20 +5,24 @@ export const useUserStore = defineStore('user', {
     userFullName: '',
     ime: '',
     prezime: '',
-    SIFRA_KORISNIKA: null // Dodajemo SIFRA_KORISNIKA
+    SIFRA_KORISNIKA: null
   }),
   actions: {
     setUser(data) {
-      this.ime = data.ime || ''
-      this.prezime = data.prezime || ''
-      this.SIFRA_KORISNIKA = data.SIFRA_KORISNIKA || null // Osiguravamo da bude spremljen
-      this.userFullName = `${this.ime} ${this.prezime}`.trim()
+      this.$patch({
+        ime: data.ime || '',
+        prezime: data.prezime || '',
+        SIFRA_KORISNIKA: data.SIFRA_KORISNIKA || null,
+        userFullName: `${data.ime || ''} ${data.prezime || ''}`.trim()
+      });
     },
     clearUser() {
-      this.ime = ''
-      this.prezime = ''
-      this.SIFRA_KORISNIKA = null // Resetiramo i ID korisnika
-      this.userFullName = ''
+      this.$patch({
+        ime: '',
+        prezime: '',
+        SIFRA_KORISNIKA: null,
+        userFullName: ''
+      });
     }
   }
 });
