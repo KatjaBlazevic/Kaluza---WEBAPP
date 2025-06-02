@@ -46,7 +46,7 @@ const routes = [
       { path: 'galerija', component: () => import('src/pages/PROFIL/GALERIJA/GalerijaPage.vue'), meta: { requiresAuth: true } },
 
       //Dodaj sliku
-      { path: 'dodaj-sliku', component: () => import('src/pages/GALERIJA/PROFIL/DodajSlikuPage.vue'), meta: { requiresAuth: true } },
+      { path: 'dodaj-sliku', component: () => import('src/pages/PROFIL/GALERIJA/DodajSlikuPage.vue'), meta: { requiresAuth: true } },
 
       //Otvori sliku
       { path: '/slika/:SIFRA_SLIKE', name: 'SlikaPage', component: () => import('src/pages/PROFIL/GALERIJA/SlikaPage.vue'), meta: { requiresAuth: true } },
@@ -66,15 +66,32 @@ const routes = [
       // Dodaj unos u dnevnik
       { path: 'dodaj-unos', name: 'DodajUnosPage', component: () => import('src/pages/PROFIL/DNEVNIK/DodajUnosPage.vue'), meta: { requiresAuth: true } },
 
-      // Prikaz termina - korisnik
-      { path: 'termin', name: 'KorisnikTerminPage', component: () => import('src/pages/KorisnikTerminPage.vue'), meta: { requiresAuth: true } },
+      // Prikaz termina
+      { path: 'termin', name: 'KorisnikTerminPage', component: () => import('src/pages/PROFIL/TERMIN/KorisnikTerminPage.vue'), meta: { requiresAuth: true } },
+
+      // Prikaz tretmana
+      { path: 'tretmani', name: 'KorisnikTretmanPage', component: () => import('src/pages/PROFIL/TRETMAN/KorisnikTretmaniPage.vue')},
+
+
+
+
+
+      //ZA VETERINARE
+      // Profil
+      { path: 'profile-veterinar', name: 'VeterinarProfilPage', component: () => import('src/pages/VETERINAR/VeterinarProfilPage.vue'), meta: { requiresAuth: true } },
+
+      // Prikaz termina
+      { path: 'termin-veterinar', name: 'VeterinarTerminPage', component: () => import('src/pages/VETERINAR/VeterinarTerminPage.vue'), meta: { requiresAuth: true } },
+
+      // Prikaz tretmana
+      { path: 'tretmani-veterinar', name: 'VeterinarTretmanPage', component: () => import('src/pages/VETERINAR/VeterinarTretmanPage.vue'), meta: { requiresAuth: true } },
     ]
   },
 
   // Error 404
   {
     path: '/:catchAll(.*)*',
-    component: () => import('pages/ErrorNotFound.vue')
+    component: () => import('src/pages/ErrorNotFound.vue')
   }
 ]
 

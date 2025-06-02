@@ -11,26 +11,6 @@
           <h1 class="hero-title">
             Dobrodošao/la, {{ userStore.userFullName }}
           </h1>
-          <div class="hero-buttons q-mt-md">
-            <q-btn
-              unelevated
-              label="Uredi profil"
-              color="white"
-              text-color="dark"
-              size="lg"
-              class="uredi-profil-btn q-mr-sm"
-              to="/uredi-profil"
-            />
-            <q-btn
-              unelevated
-              label="Pregled ljubimaca"
-              color="white"
-              text-color="dark"
-              size="lg"
-              class="uredi-profil-btn"
-              to="/pregled-ljubimaca"
-            />
-          </div>
         </div>
       </div>
 
@@ -38,45 +18,6 @@
       <div class="main-content">
         <div class="row justify-center q-gutter-xl q-mb-xl">
           <div class="info-card">
-            <q-icon name="pets" size="lg" class="section-icon" />
-            <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">GALERIJA</h2>
-            <q-btn
-              unelevated
-              label="Pogledaj galeriju"
-              color="white"
-              text-color="dark"
-              to="/galerija"
-              class="full-width card-btn"
-            />
-          </div>
-
-          <div class="info-card">
-            <q-icon name="group_add" size="lg" class="section-icon" />
-            <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">PODSJETNICI</h2>
-            <q-btn
-              unelevated
-              label="Pogledaj podsjetnike"
-              color="white"
-              text-color="dark"
-              to="/podsjetnici"
-              class="full-width card-btn"
-            />
-          </div>
-
-          <div class="info-card">
-            <q-icon name="event" size="lg" class="section-icon" />
-            <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">DNEVNIK</h2>
-            <q-btn
-              unelevated
-              label="Pogledaj dnevnik"
-              color="white"
-              text-color="dark"
-              to="/dnevnik"
-              class="full-width card-btn"
-            />
-          </div>
-
-            <div class="info-card">
             <q-icon name="event" size="lg" class="section-icon" />
             <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">TERMINI</h2>
             <q-btn
@@ -84,12 +25,12 @@
               label="Pogledaj termine"
               color="white"
               text-color="dark"
-              to="/termin"
+              to="/termin-veterinar"
               class="full-width card-btn"
             />
-            </div>
+          </div>
 
-            <div class="info-card">
+          <div class="info-card">
             <q-icon name="event" size="lg" class="section-icon" />
             <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">TRETMANI</h2>
             <q-btn
@@ -97,19 +38,7 @@
               label="Pogledaj tretmane"
               color="white"
               text-color="dark"
-              to="/tretmani"
-              class="full-width card-btn"
-            />
-          </div>
-          <div class="info-card">
-            <q-icon name="event" size="lg" class="section-icon" />
-            <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">DOKUMENTI</h2>
-            <q-btn
-              unelevated
-              label="Pogledaj dokumente"
-              color="white"
-              text-color="dark"
-              to="/dokumenti"
+              to="/tretmani-veterinar"
               class="full-width card-btn"
             />
           </div>
@@ -205,19 +134,6 @@ onMounted(fetchProfile);
   line-height: 1.7;
   margin-right: 20px;
   margin-left: 20px;
-}
-
-.hero-buttons {
-  display: flex;
-  justify-content: center;
-}
-
-.uredi-profil-btn {
-  background: white !important;
-  border-radius: 15px !important;
-  padding: 10px 30px !important;
-  font-weight: bold;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
 .main-content {

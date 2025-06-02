@@ -53,12 +53,13 @@ db.connect(err => {
 
 // Middleware za autentikaciju
 function authenticateSession(req, res, next) {
-  if (req.session && req.session.user) {
+  if (req.session?.user || req.session?.veterinar) {
     next();
   } else {
     res.status(401).json({ message: 'Niste prijavljeni.' });
   }
 }
+
 
 // REGISTRACIJA (1. KORAK REGISTRACIJE)
 app.post('/registracija', (req, res) => {
@@ -168,67 +169,92 @@ app.post('/ljubimci', async (req, res) => {
 });
 
 // PRIJAVA
-app.post('/prijava', (req, res) => {
+app.post('/prijava', async (req, res) => {
   const { username, lozinka } = req.body;
 
   if (!username || !lozinka) {
     return res.status(400).json({ message: 'Email/nadimak i lozinka su obavezni.' });
   }
 
-  const sql = `
-    SELECT * FROM Korisnik
-    WHERE (email_korisnika = ? OR nadimak_korisnika = ?) AND lozinka_korisnika = ?
-  `;
+  try {
+    // Prvo provjeri u tablici Veterinar
+    const sqlVeterinar = `
+      SELECT SIFRA_VETERINARA, email_veterinara, ime_veterinara, prezime_veterinara 
+      FROM Veterinar
+      WHERE email_veterinara = ? AND lozinka_veterinara = ?
+    `;
 
-  db.query(sql, [username, username, lozinka], (err, results) => {
-    if (err) {
-      console.error('Greška u bazi:', err);
-      return res.status(500).json({ message: 'Greška na serveru.' });
+    const [veterinarResults] = await db.promise().query(sqlVeterinar, [username, lozinka]);
+
+    if (veterinarResults.length > 0) {
+      const veterinar = veterinarResults[0];
+      req.session.veterinar = { 
+        SIFRA_VETERINARA: veterinar.SIFRA_VETERINARA,
+        email: veterinar.email_veterinara,
+        ime: veterinar.ime_veterinara,
+        prezime: veterinar.prezime_veterinara
+      };
+
+      return res.json({ message: 'Uspješna prijava', user: req.session.veterinar });
     }
 
-    if (results.length === 0) {
-      return res.status(401).json({ message: 'Neispravan email/nadimak ili lozinka.' });
+    // Ako veterinar nije pronađen, provjeri u tablici Korisnik
+    const sqlKorisnik = `
+      SELECT SIFRA_KORISNIKA, email_korisnika, ime_korisnika, prezime_korisnika 
+      FROM Korisnik
+      WHERE (email_korisnika = ? OR nadimak_korisnika = ?) AND lozinka_korisnika = ?
+    `;
+
+    const [korisnikResults] = await db.promise().query(sqlKorisnik, [username, username, lozinka]);
+
+    console.log("Korisnik rezultati:", korisnikResults);
+
+    if (korisnikResults.length > 0) {
+      const korisnik = korisnikResults[0];
+      req.session.user = { 
+        SIFRA_KORISNIKA: korisnik.SIFRA_KORISNIKA,
+        email: korisnik.email_korisnika,
+        ime: korisnik.ime_korisnika,
+        prezime: korisnik.prezime_korisnika
+      };
+
+      console.log("Korisnik spremljen u sesiju:", req.session.user);
+      return res.json({ message: 'Uspješna prijava', user: req.session.user });
     }
 
-    const user = results[0];
-    req.session.user = {
-      id: user.SIFRA_KORISNIKA,
-      email: user.email_korisnika,
-      uloga: user.uloga_korisnika,
-      ime: user.ime_korisnika,
-      prezime: user.prezime_korisnika
-    };
+    console.log("Neuspješna prijava: korisnik ili veterinar nisu pronađeni.");
+    return res.status(401).json({ message: 'Neispravan email/nadimak ili lozinka.' });
 
-    res.json({ message: 'Uspješna prijava', user: req.session.user });
-  });
+  } catch (err) {
+    console.error('Greška u bazi:', err);
+    res.status(500).json({ message: 'Greška na serveru.' });
+  }
 });
 
-// PROVJERA SESIJE
 app.get('/api/check-session', (req, res) => {
-  if (req.session && req.session.user) {
+
+  if (req.session?.veterinar) {
+    res.json({ authenticated: true, user: req.session.veterinar });
+  } else if (req.session?.user) {
     res.json({ authenticated: true, user: req.session.user });
   } else {
     res.json({ authenticated: false });
   }
 });
 
-//DOHVAĆANJE PROFILA
+
 app.get('/profile', authenticateSession, (req, res) => {
-  if (!req.session.user) {
+
+  if (req.session.veterinar) {
+    return res.json(req.session.veterinar);
+  } else if (req.session.user) {
+    return res.json(req.session.user);
+  } else {
+    console.log("Sesija ne postoji, korisnik nije prijavljen.");
     return res.status(401).json({ message: 'Korisnik nije prijavljen.' });
   }
-
-  const { ime, prezime, id } = req.session.user;
-
-  // Promjena: Sada koristimo ispravan naziv `SIFRA_KORISNIKA`
-  req.session.user.SIFRA_KORISNIKA = id;
-
-  res.json({
-    SIFRA_KORISNIKA: req.session.user.SIFRA_KORISNIKA,
-    ime,
-    prezime
-  });
 });
+
 
 
 //AŽURIRANJE PROFILA
@@ -255,14 +281,27 @@ app.put('/update-profile', (req, res) => {
 
 // DOHVATI LJUBIMCE KORISNIKA
 app.get('/moji-ljubimci', (req, res) => {
-
-  if (!req.session.user || !req.session.user.SIFRA_KORISNIKA) {
-    return res.status(401).json({ poruka: 'Korisnik nije prijavljen.' });
+  if (!req.session.user?.SIFRA_KORISNIKA && !req.session.veterinar?.SIFRA_VETERINARA) {
+    return res.status(401).json({ poruka: 'Niste prijavljeni.' });
   }
 
-  const sql = `SELECT * FROM Ljubimac WHERE SIFRA_KORISNIKA = ?`;
+  let sql;
+  let params;
 
-  db.query(sql, [req.session.user.SIFRA_KORISNIKA], (err, results) => {
+  if (req.session.user?.SIFRA_KORISNIKA) {
+    sql = `SELECT * FROM Ljubimac WHERE SIFRA_KORISNIKA = ?`;
+    params = [req.session.user.SIFRA_KORISNIKA];
+  } else {
+    sql = `
+      SELECT l.*
+      FROM Ljubimac l
+      JOIN Termin t ON l.SIFRA_LJUBIMCA = t.SIFRA_LJUBIMCA
+      WHERE t.SIFRA_VETERINARA = ?
+    `;
+    params = [req.session.veterinar.SIFRA_VETERINARA];
+  }
+
+  db.query(sql, params, (err, results) => {
     if (err) {
       console.error('Greška pri dohvaćanju ljubimaca:', err);
       return res.status(500).json({ poruka: 'Greška na serveru.', detalji: err.message });
@@ -271,6 +310,7 @@ app.get('/moji-ljubimci', (req, res) => {
     res.json(results);
   });
 });
+
 
 //UREDI POSTOJEĆEG LJUBIMCA
 app.put('/uredi-ljubimca/:id', (req, res) => {
@@ -580,7 +620,7 @@ app.put("/podsjetnici/:id", (req, res) => {
     const updateSql = `
         UPDATE Podsjetnik
         SET naziv_podsjetnika = ?, opis_podsjetnika = ?, datum_podsjetnika = ?, vrijeme_podsjetnika = ?, SIFRA_TERMINA = ?, SIFRA_DOGADAJA = ?
-        WHERE SIFRA_PODSJETNIKA = ? AND SIFRA_KORISNIKA = ? -- Dodana provjera SIFRA_KORISNIKA
+        WHERE SIFRA_PODSJETNIKA = ? AND SIFRA_KORISNIKA = ?
     `;
 
     db.query(updateSql, [naziv_podsjetnika, opis_podsjetnika, datum_podsjetnika, vrijeme_podsjetnika, finalSIFRATERMINA, finalSIFRADOGADAJA, podsjetnikId, SIFRA_KORISNIKA_SESIJA], (err, result) => {
@@ -711,6 +751,248 @@ app.delete("/dnevnik/:id",(req, res) => {
         res.json({ poruka: "Unos dnevnika uspješno obrisan." });
     });
 });
+
+//DOHVAĆANJE TERMINA
+app.get("/termin", (req, res) => {
+  if (!req.session?.user?.SIFRA_KORISNIKA && !req.session?.veterinar?.SIFRA_VETERINARA) {
+    return res.status(401).json({ poruka: "Niste prijavljeni." });
+  }
+
+  let sql;
+  let params;
+
+  if (req.session?.user?.SIFRA_KORISNIKA) {
+    // Korisnik dohvaća svoje termine
+    sql = `
+      SELECT t.SIFRA_TERMINA, t.datum_termina, t.vrijeme_termina, t.status_termina, 
+             t.simptomi_ljubimca, t.razlog_posjete, 
+             l.ime_ljubimca, v.ime_veterinara, v.prezime_veterinara, v.specijalizacija_veterinara
+      FROM Termin t
+      LEFT JOIN Ljubimac l ON t.SIFRA_LJUBIMCA = l.SIFRA_LJUBIMCA
+      LEFT JOIN Veterinar v ON t.SIFRA_VETERINARA = v.SIFRA_VETERINARA
+      WHERE t.SIFRA_KORISNIKA = ? 
+      ORDER BY t.datum_termina DESC, t.vrijeme_termina ASC
+    `;
+    params = [req.session.user.SIFRA_KORISNIKA];
+  } else {
+    // Veterinar dohvaća svoje termine
+    sql = `
+      SELECT t.SIFRA_TERMINA, t.datum_termina, t.vrijeme_termina, t.status_termina, 
+             t.simptomi_ljubimca, t.razlog_posjete, 
+             l.ime_ljubimca, k.ime_korisnika, k.prezime_korisnika, k.email_korisnika, k.broj_telefona_korisnika
+      FROM Termin t
+      LEFT JOIN Ljubimac l ON t.SIFRA_LJUBIMCA = l.SIFRA_LJUBIMCA
+      LEFT JOIN Korisnik k ON t.SIFRA_KORISNIKA = k.SIFRA_KORISNIKA
+      WHERE t.SIFRA_VETERINARA = ?
+      ORDER BY t.datum_termina DESC, t.vrijeme_termina ASC
+    `;
+    params = [req.session.veterinar.SIFRA_VETERINARA];
+  }
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("❌ Greška pri dohvaćanju termina:", err);
+      return res.status(500).json({ poruka: "❌ Greška na serveru." });
+    }
+
+    res.json(results);
+  });
+});
+
+// UREDI TERMIN-KORISNIK
+app.put("/uredi-termin-korisnik/:id", async (req, res) => {
+  const terminId = req.params.id;
+  const { datum_termina, vrijeme_termina, simptomi_ljubimca, razlog_posjete } = req.body;
+
+  try {
+    const sql = `
+      UPDATE Termin 
+      SET datum_termina = ?, vrijeme_termina = ?, simptomi_ljubimca = ?, razlog_posjete = ?
+      WHERE SIFRA_TERMINA = ?
+    `;
+
+    const params = [datum_termina, vrijeme_termina, simptomi_ljubimca, razlog_posjete, terminId];
+
+    db.query(sql, params, (err) => {
+      if (err) {
+        console.error("❌ Greška pri ažuriranju termina:", err);
+        return res.status(500).json({ poruka: "❌ Greška na serveru.", detalji: err.message });
+      }
+
+      res.json({ poruka: "✅ Termin uspješno ažuriran." });
+    });
+  } catch (error) {
+    console.error("❌ Došlo je do pogreške:", error);
+    res.status(500).json({ poruka: "❌ Greška na serveru." });
+  }
+});
+
+//ZAKAŽI TERMIN
+app.post("/zakazi-termin", async (req, res) => {
+  const { datum_termina, vrijeme_termina, simptomi_ljubimca, razlog_posjete, SIFRA_LJUBIMCA, SIFRA_VETERINARA, SIFRA_KORISNIKA } = req.body;
+
+  try {
+    const sql = `
+      INSERT INTO Termin (datum_termina, vrijeme_termina, simptomi_ljubimca, razlog_posjete, SIFRA_LJUBIMCA, SIFRA_VETERINARA, SIFRA_KORISNIKA)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const params = [datum_termina, vrijeme_termina, simptomi_ljubimca, razlog_posjete, SIFRA_LJUBIMCA, SIFRA_VETERINARA, SIFRA_KORISNIKA];
+
+    db.query(sql, params, (err) => {
+      if (err) {
+        console.error("❌ Greška pri zakazivanju termina:", err);
+        return res.status(500).json({ poruka: "❌ Greška na serveru.", detalji: err.message });
+      }
+
+      res.json({ poruka: "✅ Termin uspješno zakazan." });
+    });
+  } catch (error) {
+    console.error("❌ Došlo je do pogreške:", error);
+    res.status(500).json({ poruka: "❌ Greška na serveru." });
+  }
+});
+
+//OTKAZI TERMIN - KORISNIK
+app.put("/otkazi-termin-korisnik/:id", async (req, res) => {
+  const terminId = req.params.id;
+
+  try {
+    const sql = `
+      UPDATE Termin 
+      SET status_termina = 'Canceled'
+      WHERE SIFRA_TERMINA = ?
+    `;
+
+    db.query(sql, [terminId], (err, results) => {
+      if (err) {
+        console.error("❌ Greška pri otkazivanju termina:", err);
+        return res.status(500).json({ poruka: "❌ Greška na serveru.", detalji: err.message });
+      }
+
+      if (results.affectedRows === 0) {
+        return res.status(404).json({ poruka: "❌ Termin nije pronađen." });
+      }
+
+      res.json({ poruka: "✅ Termin uspješno otkazan." });
+    });
+  } catch (error) {
+    console.error("❌ Došlo je do pogreške:", error);
+    res.status(500).json({ poruka: "❌ Greška na serveru." });
+  }
+});
+
+//UREĐIVANJE TERMINA - VETERINAR
+app.put('/termini/:SIFRA_TERMINA/status', async (req, res) => {
+  const { SIFRA_TERMINA } = req.params;
+  const { status_termina } = req.body;
+
+  if (!req.session?.veterinar?.SIFRA_VETERINARA) {
+    return res.status(401).json({ message: 'Neautoriziran pristup. Samo veterinari mogu mijenjati status termina.' });
+  }
+
+  try {
+    // Dohvati trenutne podatke termina
+    const [currentTermin] = await db.promise().query(
+      "SELECT * FROM Termin WHERE SIFRA_TERMINA = ?",
+      [SIFRA_TERMINA]
+    );
+
+    if (currentTermin.length === 0) {
+      return res.status(404).json({ message: "Termin nije pronađen." });
+    }
+
+    // Ažuriraj status, ostali podaci ostaju isti
+    const sql = `
+      UPDATE Termin 
+      SET status_termina = ? 
+      WHERE SIFRA_TERMINA = ?
+    `;
+
+    await db.promise().query(sql, [status_termina, SIFRA_TERMINA]);
+
+    res.json({ message: "Status termina uspješno ažuriran.", novi_status: status_termina });
+  } catch (err) {
+    console.error("Greška pri ažuriranju statusa termina:", err);
+    res.status(500).json({ message: "Greška na serveru." });
+  }
+});
+
+//KORISNIK - TRETMANI
+app.get('/tretmani/korisnik/:SIFRA_KORISNIKA', async (req, res) => {
+  const { SIFRA_KORISNIKA } = req.params;
+  console.log("Primljen zahtjev za korisnika:", SIFRA_KORISNIKA);
+
+  try {
+    db.query(
+      `SELECT t.*, l.ime_ljubimca 
+       FROM Tretman t
+       JOIN Ljubimac l ON t.SIFRA_LJUBIMCA = l.SIFRA_LJUBIMCA
+       WHERE l.SIFRA_KORISNIKA = ?`,
+      [SIFRA_KORISNIKA],
+      (error, results) => {
+        if (error) {
+          console.error("Greška pri dohvaćanju tretmana:", error);
+          return res.status(500).json({ message: "Greška pri dohvaćanju tretmana." });
+        }
+
+        res.json(results);
+      }
+    );
+  } catch (error) {
+    console.error("Greška pri dohvaćanju tretmana:", error);
+    res.status(500).json({ message: "Greška pri dohvaćanju tretmana." });
+  }
+});
+
+
+//VETERINARI - DOHVAĆANJE TRETMANA
+app.get('/tretmani/veterinar/:SIFRA_VETERINARA', (req, res) => {
+  const { SIFRA_VETERINARA } = req.params;
+  console.log("Primljen zahtjev za veterinara:", SIFRA_VETERINARA);
+
+  db.query(
+    `SELECT t.*, l.ime_ljubimca, k.ime_korisnika AS ime_vlasnika, k.prezime_korisnika AS prezime_vlasnika
+     FROM Tretman t
+     JOIN Ljubimac l ON t.SIFRA_LJUBIMCA = l.SIFRA_LJUBIMCA
+     JOIN Korisnik k ON l.SIFRA_KORISNIKA = k.SIFRA_KORISNIKA
+     WHERE t.SIFRA_VETERINARA = ?`,
+    [SIFRA_VETERINARA],
+    (error, results) => {
+      if (error) {
+        console.error("Greška pri dohvaćanju tretmana veterinara:", error);
+        return res.status(500).json({ message: "Greška pri dohvaćanju tretmana veterinara." });
+      }
+
+      res.json(results);
+    }
+  );
+});
+
+
+//VETERINARI - UNOS TRETMANA
+app.post('/tretmani/veterinar/:SIFRA_VETERINARA', (req, res) => {
+  const { SIFRA_VETERINARA } = req.params;
+  const { datum_lijecenja, vrijeme_lijecenja, bolest_ljubimca, lijecenje_ljubimca, SIFRA_LJUBIMCA, SIFRA_TERMINA } = req.body;
+
+  console.log("Primljen zahtjev za unos tretmana od veterinara:", SIFRA_VETERINARA);
+
+  db.query(
+    `INSERT INTO Tretman (datum_lijecenja, vrijeme_lijecenja, bolest_ljubimca, lijecenje_ljubimca, SIFRA_VETERINARA, SIFRA_LJUBIMCA, SIFRA_TERMINA)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [datum_lijecenja, vrijeme_lijecenja, bolest_ljubimca, lijecenje_ljubimca, SIFRA_VETERINARA, SIFRA_LJUBIMCA, SIFRA_TERMINA],
+    (error, results) => {
+      if (error) {
+        console.error("Greška pri unosu tretmana:", error);
+        return res.status(500).json({ message: "Greška pri unosu tretmana." });
+      }
+
+      console.log("Tretman uspješno unesen!", results);
+      res.json({ message: "Tretman uspješno unesen!", tretmanId: results.insertId });
+    }
+  );
+});
+
 
 // ODJAVA
 app.post('/logout', (req, res) => {

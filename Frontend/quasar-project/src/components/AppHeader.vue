@@ -17,7 +17,12 @@
 
       <!-- Desno - Profil -->
       <div class="header-right gt-sm">
-        <q-btn flat label="Moj profil" to="/profile" class="text-button" />
+        <q-btn
+          flat
+          label="Moj profil"
+          :to="userStore?.SIFRA_VETERINARA ? '/profile-veterinar' : '/profile'"
+          class="text-button"
+        />
       </div>
 
       <!-- Mobilni meni ikona -->
@@ -66,8 +71,10 @@
 
 <script setup>
 import { ref } from 'vue';
+import { useUserStore } from '@/stores/user'; // Ispravan import za userStore
 
 const leftDrawerOpen = ref(false);
+const userStore = useUserStore(); // Osiguraj da je userStore dostupan
 
 const links = [
   { label: 'Početna', to: '/' },
@@ -75,12 +82,15 @@ const links = [
   { label: 'Događaji', to: '/events' },
   { label: 'Veterinari', to: '/vets' },
   { label: 'Kontakt', to: '/contact' },
-  { label: 'Moj profil', to: '/profile' }
+  { label: 'Moj profil', to: userStore?.SIFRA_VETERINARA ? '/profile-veterinar' : '/profile' }
 ];
 
 const toggleLeftDrawer = () => {
   leftDrawerOpen.value = !leftDrawerOpen.value;
 };
+
+// Debugging - provjeri podatke iz userStore
+console.log("UserStore podaci:", userStore);
 </script>
 
 <style scoped>

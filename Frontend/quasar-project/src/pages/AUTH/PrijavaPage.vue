@@ -53,34 +53,42 @@ const errorMsg = ref('')
 const router = useRouter()
 
 const submitLogin = async () => {
-  loading.value = true
-  errorMsg.value = ''
+  loading.value = true;
+  errorMsg.value = '';
 
   try {
     const res = await fetch('http://localhost:3000/prijava', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',  // OVO JE KLJUČNO za slanje sesijskog cookieja
+      credentials: 'include',
       body: JSON.stringify({
         username: username.value,
         lozinka: lozinka.value
       })
-    })
+    });
 
-    const data = await res.json()
+    const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.message || 'Neispravni podaci za prijavu.')
+      throw new Error(data.message || 'Neispravni podaci za prijavu.');
     }
 
-    // Nema tokena, samo redirect jer je sesija postavljena na backendu
-    router.push('/profile')
+    // Provjeri da li je prijavljen veterinar ili korisnik
+    if (data.user.SIFRA_VETERINARA) {
+      router.push('/profile-veterinar');  // Veterinar ide na zasebnu stranicu
+    } else if (data.user.SIFRA_KORISNIKA) {
+      router.push('/profile');  // Korisnici idu na standardni profil
+    } else {
+      throw new Error('Neuspješna prijava. Korisnik nije prepoznat.');
+    }
+
   } catch (err) {
-    errorMsg.value = err.message
+    errorMsg.value = err.message;
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
+
 
 </script>
 
