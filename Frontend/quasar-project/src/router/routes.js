@@ -43,19 +43,31 @@ const routes = [
       { path: 'uredi-ljubimca/:id', component: () => import('src/pages/PROFIL/UrediLjubimcaPage.vue'), meta: { requiresAuth: true } },
 
       //Galerija
-      { path: 'galerija', component: () => import('src/pages/GALERIJA/GalerijaPage.vue'), meta: { requiresAuth: true } },
+      { path: 'galerija', component: () => import('src/pages/PROFIL/GALERIJA/GalerijaPage.vue'), meta: { requiresAuth: true } },
 
       //Dodaj sliku
-      { path: 'dodaj-sliku', component: () => import('src/pages/GALERIJA/DodajSlikuPage.vue'), meta: { requiresAuth: true } },
+      { path: 'dodaj-sliku', component: () => import('src/pages/GALERIJA/PROFIL/DodajSlikuPage.vue'), meta: { requiresAuth: true } },
 
       //Otvori sliku
-      { path: '/slika/:SIFRA_SLIKE', name: 'SlikaPage', component: () => import('src/pages/GALERIJA/SlikaPage.vue'), meta: { requiresAuth: true } },
+      { path: '/slika/:SIFRA_SLIKE', name: 'SlikaPage', component: () => import('src/pages/PROFIL/GALERIJA/SlikaPage.vue'), meta: { requiresAuth: true } },
 
       // Uredi sliku
-      { path: '/slika/:SIFRA_SLIKE/uredi', name: 'UrediSlikuPage', component: () => import('src/pages/GALERIJA/UrediSlikuPage.vue'), meta: { requiresAuth: true } },
+      { path: '/slika/:SIFRA_SLIKE/uredi', name: 'UrediSlikuPage', component: () => import('src/pages/PROFIL/GALERIJA/UrediSlikuPage.vue'), meta: { requiresAuth: true } },
 
       // Podsjetnici
-      { path: 'podsjetnici', name: 'PodsjetniciPage', component: () => import('src/pages/PODSJETNICI/PodsjetniciPage.vue'), meta: { requiresAuth: true } },
+      { path: 'podsjetnici', name: 'PodsjetniciPage', component: () => import('src/pages/PROFIL/PODSJETNICI/PodsjetniciPage.vue'), meta: { requiresAuth: true } },
+
+       // Dodaj podsjetnik
+      { path: 'dodaj-podsjetnik', name: 'DodajPodsjetnikPage', component: () => import('src/pages/PROFIL/PODSJETNICI/DodajPodsjetnikPage.vue'), meta: { requiresAuth: true } },
+
+       // Dnevnik
+      { path: 'dnevnik', name: 'DnevnikPage', component: () => import('src/pages/PROFIL/DNEVNIK/DnevnikPage.vue'), meta: { requiresAuth: true } },
+
+      // Dodaj unos u dnevnik
+      { path: 'dodaj-unos', name: 'DodajUnosPage', component: () => import('src/pages/PROFIL/DNEVNIK/DodajUnosPage.vue'), meta: { requiresAuth: true } },
+
+      // Prikaz termina - korisnik
+      { path: 'termin', name: 'KorisnikTerminPage', component: () => import('src/pages/KorisnikTerminPage.vue'), meta: { requiresAuth: true } },
     ]
   },
 

@@ -36,7 +36,7 @@ const poruka = ref('')
 
 async function fetchProfile() {
   try {
-    const res = await fetch('http://localhost:3000/profile', { credentials: 'include' });
+    const res = await fetch('http://localhost:3000/full-profile', { credentials: 'include' });
 
     if (!res.ok) {
       router.push('/prijava');
