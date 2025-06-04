@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { defineStore } from 'pinia';
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -6,7 +6,8 @@ export const useUserStore = defineStore('user', {
     ime: '',
     prezime: '',
     SIFRA_KORISNIKA: null,
-    SIFRA_VETERINARA: null // Dodano za veterinara
+    SIFRA_VETERINARA: null, // ✅ Veterinar ostaje
+    SIFRA_ADMINISTRATORA: null // ✅ Dodano za administratora
   }),
   actions: {
     setUser(data) {
@@ -15,7 +16,8 @@ export const useUserStore = defineStore('user', {
         prezime: data.prezime || '',
         userFullName: `${data.ime || ''} ${data.prezime || ''}`.trim(),
         SIFRA_KORISNIKA: data.SIFRA_KORISNIKA || null,
-        SIFRA_VETERINARA: data.SIFRA_VETERINARA || null // Spremi veterinara ako postoji
+        SIFRA_VETERINARA: data.SIFRA_VETERINARA || null, // ✅ Veterinar ostaje
+        SIFRA_ADMINISTRATORA: data.SIFRA_ADMINISTRATORA || null // ✅ Spremi administratora ako postoji
       });
     },
     clearUser() {
@@ -24,7 +26,8 @@ export const useUserStore = defineStore('user', {
         prezime: '',
         userFullName: '',
         SIFRA_KORISNIKA: null,
-        SIFRA_VETERINARA: null
+        SIFRA_VETERINARA: null,
+        SIFRA_ADMINISTRATORA: null
       });
     }
   }

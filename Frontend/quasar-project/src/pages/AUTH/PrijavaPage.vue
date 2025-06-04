@@ -73,11 +73,13 @@ const submitLogin = async () => {
       throw new Error(data.message || 'Neispravni podaci za prijavu.');
     }
 
-    // Provjeri da li je prijavljen veterinar ili korisnik
-    if (data.user.SIFRA_VETERINARA) {
-      router.push('/profile-veterinar');  // Veterinar ide na zasebnu stranicu
+    // 📌 Provjeri da li je prijavljen administrator, veterinar ili korisnik
+    if (data.user.SIFRA_ADMINISTRATORA) {
+      router.push('/admin');  // ✅ Administrator ide na admin panel
+    } else if (data.user.SIFRA_VETERINARA) {
+      router.push('/profile-veterinar');  // ✅ Veterinar ide na zasebnu stranicu
     } else if (data.user.SIFRA_KORISNIKA) {
-      router.push('/profile');  // Korisnici idu na standardni profil
+      router.push('/profile');  // ✅ Korisnici idu na standardni profil
     } else {
       throw new Error('Neuspješna prijava. Korisnik nije prepoznat.');
     }
@@ -88,7 +90,6 @@ const submitLogin = async () => {
     loading.value = false;
   }
 };
-
 
 </script>
 

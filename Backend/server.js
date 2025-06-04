@@ -177,7 +177,25 @@ app.post('/prijava', async (req, res) => {
   }
 
   try {
-    // Prvo provjeri u tablici Veterinar
+    // 📌 Provjera administratora
+    const sqlAdmin = `
+      SELECT SIFRA_ADMINISTRATORA, nadimak_admina
+      FROM Administrator
+      WHERE nadimak_admina = ? AND lozinka_admina = ?
+    `;
+
+    const [adminResults] = await db.promise().query(sqlAdmin, [username, lozinka]);
+
+    if (adminResults.length > 0) {
+      const admin = adminResults[0];
+      req.session.admin = { 
+        SIFRA_ADMINISTRATORA: admin.SIFRA_ADMINISTRATORA,
+        nadimak: admin.nadimak_admina
+      };
+      return res.json({ message: 'Uspješna prijava', user: req.session.admin });
+    }
+
+    // 📌 Provjera veterinara
     const sqlVeterinar = `
       SELECT SIFRA_VETERINARA, email_veterinara, ime_veterinara, prezime_veterinara 
       FROM Veterinar
@@ -198,7 +216,7 @@ app.post('/prijava', async (req, res) => {
       return res.json({ message: 'Uspješna prijava', user: req.session.veterinar });
     }
 
-    // Ako veterinar nije pronađen, provjeri u tablici Korisnik
+    // 📌 Provjera korisnika
     const sqlKorisnik = `
       SELECT SIFRA_KORISNIKA, email_korisnika, ime_korisnika, prezime_korisnika 
       FROM Korisnik
@@ -218,7 +236,7 @@ app.post('/prijava', async (req, res) => {
       return res.json({ message: 'Uspješna prijava', user: req.session.user });
     }
 
-    console.log("Neuspješna prijava: korisnik ili veterinar nisu pronađeni.");
+    console.log("Neuspješna prijava: korisnik, veterinar ili administrator nisu pronađeni.");
     return res.status(401).json({ message: 'Neispravan email/nadimak ili lozinka.' });
 
   } catch (err) {
@@ -228,11 +246,12 @@ app.post('/prijava', async (req, res) => {
 });
 
 app.get('/api/check-session', (req, res) => {
-
-  if (req.session?.veterinar) {
-    res.json({ authenticated: true, user: req.session.veterinar });
+  if (req.session?.admin) {
+    res.json({ authenticated: true, user: req.session.admin, role: 'admin' }); 
+  } else if (req.session?.veterinar) {
+    res.json({ authenticated: true, user: req.session.veterinar, role: 'veterinar' });
   } else if (req.session?.user) {
-    res.json({ authenticated: true, user: req.session.user });
+    res.json({ authenticated: true, user: req.session.user, role: 'korisnik' });
   } else {
     res.json({ authenticated: false });
   }
@@ -1180,6 +1199,126 @@ app.get('/veterinari', (req, res) => {
     if (err) return res.status(500).json(err);
     res.json(results);
   });
+});
+
+//ADMINISTRATOR STATS
+app.get("/admin/stats", (req, res) => {
+  if (!req.session?.admin) {
+    return res.status(403).json({ poruka: "Niste administrator." });
+  }
+
+  const sql = `
+    SELECT 
+      (SELECT COUNT(*) FROM Korisnik) AS korisnici,
+      (SELECT COUNT(*) FROM Veterinar) AS veterinari,
+      (SELECT COUNT(*) FROM Dogadaj) AS dogadaji
+  `;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("❌ Greška pri dohvaćanju statistike:", err);
+      return res.status(500).json({ poruka: "❌ Greška na serveru." });
+    }
+
+    res.json(result[0]);
+  });
+});
+
+
+//ADMIN - KORISNICI PRIKAZ
+app.get("/admin/korisnici", async (req, res) => {
+  if (!req.session?.admin) return res.status(403).json({ poruka: "Niste administrator." });
+
+  try {
+    const sql = "SELECT SIFRA_KORISNIKA, ime_korisnika, prezime_korisnika, email_korisnika, nadimak_korisnika FROM Korisnik";
+    const [korisnici] = await db.promise().query(sql);
+    res.json(korisnici);
+  } catch (err) {
+    console.error("❌ Greška pri dohvaćanju korisnika:", err);
+    res.status(500).json({ poruka: "❌ Greška na serveru." });
+  }
+});
+
+//ADMIN - KORISNICI BRISANJE
+app.delete("/admin/korisnici/:id", async (req, res) => {
+  if (!req.session?.admin) return res.status(403).json({ poruka: "Niste administrator." });
+
+  try {
+    // Prvo obriši sve povezane podsjetnike
+    await db.promise().query("DELETE FROM Podsjetnik WHERE SIFRA_KORISNIKA = ?", [req.params.id]);
+    
+    // Sada možeš sigurno obrisati korisnika
+    await db.promise().query("DELETE FROM Korisnik WHERE SIFRA_KORISNIKA = ?", [req.params.id]);
+
+    res.json({ poruka: "Korisnik i svi povezani podsjetnici uspješno obrisani." });
+  } catch (err) {
+    console.error("❌ Greška pri brisanju korisnika:", err);
+    res.status(500).json({ poruka: "❌ Greška na serveru." });
+  }
+});
+
+//ADMIN - DOGADAJI PRIKAZ
+app.get("/admin/dogadaji", async (req, res) => {
+  const sql = "SELECT * FROM Dogadaj";
+  const [dogadaji] = await db.promise().query(sql);
+  res.json(dogadaji);
+});
+
+//ADMIN - DOGADAJI UREDIVANJE
+app.post("/admin/dogadaji", async (req, res) => {
+  console.log("Primljeni podaci:", req.body); // ✅ Debugging log
+  
+  const { naziv_dogadaja, vrsta_dogadaja, opis_dogadaja, grad, adresa, datum_dogadaja, vrijeme_dogadaja } = req.body;
+  const sql = "INSERT INTO Dogadaj (naziv_dogadaja, vrsta_dogadaja, opis_dogadaja, grad, adresa, datum_dogadaja, vrijeme_dogadaja) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  
+  try {
+    await db.promise().query(sql, [naziv_dogadaja, vrsta_dogadaja, opis_dogadaja, grad, adresa, datum_dogadaja, vrijeme_dogadaja]);
+    res.json({ poruka: "Događaj uspješno dodan." });
+  } catch (err) {
+    console.error("❌ Greška pri spremanju događaja:", err);
+    res.status(500).json({ poruka: "❌ Greška na serveru." });
+  }
+});
+
+
+//ADMIN - DOGADAJI DODAVANJE
+app.put("/admin/dogadaji/:id", async (req, res) => {
+  const sql = "UPDATE Dogadaj SET ? WHERE SIFRA_DOGADAJA = ?";
+  await db.promise().query(sql, [req.body, req.params.id]);
+  res.json({ poruka: "Događaj uspješno ažuriran." });
+});
+
+//ADMIN - DOGADAJI BRISANJE
+app.delete("/admin/dogadaji/:id", async (req, res) => {
+  await db.promise().query("DELETE FROM Dogadaj WHERE SIFRA_DOGADAJA = ?", [req.params.id]);
+  res.json({ poruka: "Događaj uspješno obrisan." });
+});
+
+//ADMIN - VETERINARI PRIKAZ
+app.get("/admin/veterinari", async (req, res) => {
+  const sql = "SELECT * FROM Veterinar";
+  const [veterinari] = await db.promise().query(sql);
+  res.json(veterinari);
+});
+
+//ADMIN - VETERINARI DODAVANJE
+app.post("/admin/veterinari", async (req, res) => {
+  const sql = "INSERT INTO Veterinar SET ?";
+  await db.promise().query(sql, req.body);
+  res.json({ poruka: "Veterinar uspješno dodan." });
+});
+
+//ADMIN - VETERINARI UREDIVANJE
+app.put("/admin/veterinari/:id", async (req, res) => {
+  const sql = "UPDATE Veterinar SET ? WHERE SIFRA_VETERINARA = ?";
+  await db.promise().query(sql, [req.body, req.params.id]);
+  res.json({ poruka: "Veterinar uspješno ažuriran." });
+});
+
+//ADMIN - VETERINARI BRISANJE
+app.delete("/admin/veterinari/:id", async (req, res) => {
+  await db.promise().query("DELETE FROM Veterinar WHERE SIFRA_VETERINARA = ?", [req.params.id]);
+  res.json({ poruka: "Veterinar uspješno obrisan." });
 });
 
 // Pokretanje servera
