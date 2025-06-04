@@ -207,8 +207,6 @@ app.post('/prijava', async (req, res) => {
 
     const [korisnikResults] = await db.promise().query(sqlKorisnik, [username, username, lozinka]);
 
-    console.log("Korisnik rezultati:", korisnikResults);
-
     if (korisnikResults.length > 0) {
       const korisnik = korisnikResults[0];
       req.session.user = { 
@@ -217,8 +215,6 @@ app.post('/prijava', async (req, res) => {
         ime: korisnik.ime_korisnika,
         prezime: korisnik.prezime_korisnika
       };
-
-      console.log("Korisnik spremljen u sesiju:", req.session.user);
       return res.json({ message: 'Uspješna prijava', user: req.session.user });
     }
 
@@ -779,6 +775,7 @@ app.get("/termin", (req, res) => {
     sql = `
       SELECT t.SIFRA_TERMINA, t.datum_termina, t.vrijeme_termina, t.status_termina, 
              t.simptomi_ljubimca, t.razlog_posjete, 
+             l.SIFRA_LJUBIMCA,
              l.ime_ljubimca, k.ime_korisnika, k.prezime_korisnika, k.email_korisnika, k.broj_telefona_korisnika
       FROM Termin t
       LEFT JOIN Ljubimac l ON t.SIFRA_LJUBIMCA = l.SIFRA_LJUBIMCA
@@ -919,17 +916,16 @@ app.put('/termini/:SIFRA_TERMINA/status', async (req, res) => {
 });
 
 //KORISNIK - TRETMANI
-app.get('/tretmani/korisnik/:SIFRA_KORISNIKA', async (req, res) => {
-  const { SIFRA_KORISNIKA } = req.params;
-  console.log("Primljen zahtjev za korisnika:", SIFRA_KORISNIKA);
+app.get('/tretmani/termin/:SIFRA_TERMINA/:SIFRA_KORISNIKA', async (req, res) => {
+  const { SIFRA_TERMINA, SIFRA_KORISNIKA } = req.params;
 
   try {
     db.query(
       `SELECT t.*, l.ime_ljubimca 
        FROM Tretman t
        JOIN Ljubimac l ON t.SIFRA_LJUBIMCA = l.SIFRA_LJUBIMCA
-       WHERE l.SIFRA_KORISNIKA = ?`,
-      [SIFRA_KORISNIKA],
+       WHERE t.SIFRA_TERMINA = ? AND l.SIFRA_KORISNIKA = ?`, 
+      [SIFRA_TERMINA, SIFRA_KORISNIKA],
       (error, results) => {
         if (error) {
           console.error("Greška pri dohvaćanju tretmana:", error);
@@ -946,10 +942,10 @@ app.get('/tretmani/korisnik/:SIFRA_KORISNIKA', async (req, res) => {
 });
 
 
+
 //VETERINARI - DOHVAĆANJE TRETMANA
 app.get('/tretmani/veterinar/:SIFRA_VETERINARA', (req, res) => {
   const { SIFRA_VETERINARA } = req.params;
-  console.log("Primljen zahtjev za veterinara:", SIFRA_VETERINARA);
 
   db.query(
     `SELECT t.*, l.ime_ljubimca, k.ime_korisnika AS ime_vlasnika, k.prezime_korisnika AS prezime_vlasnika
@@ -975,7 +971,6 @@ app.post('/tretmani/veterinar/:SIFRA_VETERINARA', (req, res) => {
   const { SIFRA_VETERINARA } = req.params;
   const { datum_lijecenja, vrijeme_lijecenja, bolest_ljubimca, lijecenje_ljubimca, SIFRA_LJUBIMCA, SIFRA_TERMINA } = req.body;
 
-  console.log("Primljen zahtjev za unos tretmana od veterinara:", SIFRA_VETERINARA);
 
   db.query(
     `INSERT INTO Tretman (datum_lijecenja, vrijeme_lijecenja, bolest_ljubimca, lijecenje_ljubimca, SIFRA_VETERINARA, SIFRA_LJUBIMCA, SIFRA_TERMINA)
@@ -986,13 +981,131 @@ app.post('/tretmani/veterinar/:SIFRA_VETERINARA', (req, res) => {
         console.error("Greška pri unosu tretmana:", error);
         return res.status(500).json({ message: "Greška pri unosu tretmana." });
       }
-
-      console.log("Tretman uspješno unesen!", results);
       res.json({ message: "Tretman uspješno unesen!", tretmanId: results.insertId });
     }
   );
 });
 
+//DOHVAĆANJE DOKUMENATA
+app.get('/dokument', (req, res) => {
+  if (!req.session?.user?.SIFRA_KORISNIKA) {
+    return res.status(401).json({ poruka: 'Niste prijavljeni.' });
+  }
+
+ const sql = `
+  SELECT d.SIFRA_DOKUMENTA, d.cijepiva_ljubimca, d.lijekovi_ljubimca,
+         d.putovnica_ljubimca, d.rodovnica_ljubimca, d.SIFRA_LJUBIMCA,
+         l.ime_ljubimca
+  FROM Dokument d
+  JOIN Ljubimac l ON d.SIFRA_LJUBIMCA = l.SIFRA_LJUBIMCA
+  WHERE d.SIFRA_KORISNIKA = ?
+`;
+
+  db.query(sql, [req.session.user.SIFRA_KORISNIKA], (err, results) => {
+    if (err) {
+      console.error('❌ Greška pri dohvaćanju dokumenata:', err);
+      return res.status(500).json({ poruka: '❌ Greška na serveru.' });
+    }
+
+    // Konvertiraj Buffer u Base64 prije slanja na frontend
+    results.forEach(dok => {
+      if (Buffer.isBuffer(dok.putovnica_ljubimca)) {
+        dok.putovnica_ljubimca = dok.putovnica_ljubimca.toString('base64');
+      }
+      if (Buffer.isBuffer(dok.rodovnica_ljubimca)) {
+        dok.rodovnica_ljubimca = dok.rodovnica_ljubimca.toString('base64');
+      }
+    });
+    res.json(results);
+  });
+});
+
+
+//UREĐIVANJE DOKUMENATA
+app.put('/dokument/:id', (req, res) => {
+  const { id } = req.params;
+  const { cijepiva_ljubimca, lijekovi_ljubimca, putovnica_ljubimca, rodovnica_ljubimca } = req.body;
+
+  // Provjeri je li korisnik prijavljen
+  if (!req.session?.user?.SIFRA_KORISNIKA) {
+    return res.status(401).json({ poruka: 'Niste prijavljeni.' });
+  }
+
+  // SQL upit za ažuriranje dokumenta
+  const sql = `
+    UPDATE Dokument 
+    SET cijepiva_ljubimca = ?, lijekovi_ljubimca = ?, 
+        putovnica_ljubimca = ?, rodovnica_ljubimca = ?
+    WHERE SIFRA_DOKUMENTA = ? AND SIFRA_KORISNIKA = ?
+  `;
+
+  const params = [cijepiva_ljubimca, lijekovi_ljubimca, putovnica_ljubimca, rodovnica_ljubimca, id, req.session.user.SIFRA_KORISNIKA];
+
+  db.query(sql, params, (err, result) => {
+    if (err) {
+      console.error('❌ Greška pri ažuriranju dokumenta:', err);
+      return res.status(500).json({ poruka: '❌ Greška na serveru.' });
+    }
+
+    res.json({ poruka: '✅ Dokument uspješno ažuriran!' });
+  });
+});
+
+//DODAVANJE DOKUMENTA
+app.post('/dokument', (req, res) => {
+
+  const { SIFRA_LJUBIMCA, cijepiva_ljubimca, lijekovi_ljubimca, putovnica_ljubimca, rodovnica_ljubimca } = req.body;
+
+  if (!req.session?.user?.SIFRA_KORISNIKA) {
+    return res.status(401).json({ poruka: 'Niste prijavljeni.' });
+  }
+
+  const sql = `
+    INSERT INTO Dokument (SIFRA_LJUBIMCA, cijepiva_ljubimca, lijekovi_ljubimca, putovnica_ljubimca, rodovnica_ljubimca, SIFRA_KORISNIKA)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
+
+  const params = [
+    SIFRA_LJUBIMCA || null, // ✅ Dodali `SIFRA_LJUBIMCA`
+    cijepiva_ljubimca || null,
+    lijekovi_ljubimca || null,
+    putovnica_ljubimca || null,
+    rodovnica_ljubimca || null,
+    req.session.user.SIFRA_KORISNIKA
+  ];
+
+  db.query(sql, params, (err, result) => {
+    if (err) {
+      console.error('❌ Greška pri dodavanju dokumenta:', err);
+      return res.status(500).json({ poruka: '❌ Greška na serveru.' });
+    }
+
+    res.json({ poruka: '✅ Dokument uspješno dodan!', id: result.insertId });
+  });
+});
+
+//BRISANJE DOKUMENATA
+app.delete('/dokument/:id', (req, res) => {
+  const { id } = req.params;
+
+  if (!req.session?.user?.SIFRA_KORISNIKA) {
+    return res.status(401).json({ poruka: '❌ Niste prijavljeni.' });
+  }
+
+  const sql = `
+    DELETE FROM Dokument 
+    WHERE SIFRA_DOKUMENTA = ? AND SIFRA_KORISNIKA = ?
+  `;
+
+  db.query(sql, [id, req.session.user.SIFRA_KORISNIKA], (err, result) => {
+    if (err) {
+      console.error('❌ Greška pri brisanju dokumenta:', err);
+      return res.status(500).json({ poruka: '❌ Greška na serveru.' });
+    }
+
+    res.json({ poruka: '✅ Dokument uspješno obrisan!' });
+  });
+});
 
 // ODJAVA
 app.post('/logout', (req, res) => {

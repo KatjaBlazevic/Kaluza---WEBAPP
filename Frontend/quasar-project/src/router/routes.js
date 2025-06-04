@@ -69,8 +69,8 @@ const routes = [
       // Prikaz termina
       { path: 'termin', name: 'KorisnikTerminPage', component: () => import('src/pages/PROFIL/TERMIN/KorisnikTerminPage.vue'), meta: { requiresAuth: true } },
 
-      // Prikaz tretmana
-      { path: 'tretmani', name: 'KorisnikTretmanPage', component: () => import('src/pages/PROFIL/TRETMAN/KorisnikTretmaniPage.vue')},
+      // Prikaz dokumenata
+      { path: 'dokumenti', name: 'DokumentiPage', component: () => import('src/pages/PROFIL/DOKUMENTI/DokumentiPage.vue'), meta: { requiresAuth: true } },
 
 
 

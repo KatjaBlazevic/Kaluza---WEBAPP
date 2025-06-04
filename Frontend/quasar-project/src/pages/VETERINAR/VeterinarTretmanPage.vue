@@ -19,7 +19,7 @@
       <div v-if="filteredTretmani.length > 0">
         <div class="tretmani-section">
           <div class="row justify-center q-gutter-md">
-            <div v-for="t in filteredTretmani"
+            <div v-for="t in (showAllTretmani ? filteredTretmani : filteredTretmani.slice(0, 3))"
               :key="t.SIFRA_TRETMANA"
               class="tretman-card col-xs-12 col-sm-6 col-md-4">
               <q-card-section class="text-left">
@@ -43,6 +43,13 @@
                 </p>
               </q-card-section>
             </div>
+          </div>
+
+          <!-- Dugme za prikaz više/manje -->
+          <div class="q-mt-lg text-center">
+            <q-btn v-if="filteredTretmani.length > 3" @click="toggleShowAllTretmani" flat color="primary">
+              {{ showAllTretmani ? 'Prikaži manje' : 'Prikaži više' }}
+            </q-btn>
           </div>
         </div>
       </div>
@@ -68,34 +75,36 @@
               map-options
               :rules="[val => !!val || 'Molimo odaberite ljubimca']"
             />
+
             <q-select
               outlined
               v-model="noviTretman.SIFRA_TERMINA"
-              :options="terminiOptions"
+              :options="filteredTermini"
               label="Odaberi termin"
               emit-value
               map-options
               :rules="[val => !!val || 'Molimo odaberite termin']"
             />
-  <q-input
-  outlined
-  v-model="noviTretman.datum_lijecenja"
-  label="Datum liječenja"
-  placeholder="dd/mm/yyyy"
-  mask="##/##/####"
-  fill-mask
-  @blur="validateDateFormat"
-/>
 
-<q-input
-  outlined
-  v-model="noviTretman.vrijeme_lijecenja"
-  label="Vrijeme liječenja"
-  placeholder="hh:mm"
-  mask="##:##"
-  fill-mask
-  @blur="validateTimeFormat"
-/>
+            <q-input
+              outlined
+              v-model="noviTretman.datum_lijecenja"
+              label="Datum liječenja"
+              placeholder="dd.mm.yyyy"
+              mask="##.##.####"
+              fill-mask
+              @blur="validateDateFormat"
+            />
+
+            <q-input
+              outlined
+              v-model="noviTretman.vrijeme_lijecenja"
+              label="Vrijeme liječenja"
+              placeholder="hh:mm"
+              mask="##:##"
+              fill-mask
+              @blur="validateTimeFormat"
+            />
 
             <q-input outlined v-model="noviTretman.bolest_ljubimca" label="Dijagnoza" type="textarea" rows="3"/>
             <q-input outlined v-model="noviTretman.lijecenje_ljubimca" label="Terapija" type="textarea" rows="2"/>
@@ -119,6 +128,7 @@ const userStore = useUserStore();
 const tretmani = ref([]);
 const searchQuery = ref('');
 const showTretmanDialog = ref(false);
+const odabraniLjubimac = ref(null);
 const noviTretman = ref({
   datum_lijecenja: '',
   vrijeme_lijecenja: '',
@@ -129,11 +139,23 @@ const noviTretman = ref({
 });
 const ljubimciOptions = ref([]);
 const terminiOptions = ref([]);
+const showAllTretmani = ref(false);
+
+const filteredTermini = computed(() => {
+  if (!noviTretman.value.SIFRA_LJUBIMCA) return [];
+  return terminiOptions.value.filter(t => t.SIFRA_LJUBIMCA === noviTretman.value.SIFRA_LJUBIMCA);
+});
+
+function toggleShowAllTretmani() {
+  showAllTretmani.value = !showAllTretmani.value;
+}
+
+
 
 function validateDateFormat() {
-  const regex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
+  const regex = /^(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[0-2])\.\d{4}$/;
   if (!regex.test(noviTretman.value.datum_lijecenja)) {
-    alert("Molimo unesite datum u formatu dd/mm/yyyy (npr. 05/06/2025)");
+    alert("Molimo unesite datum u formatu dd.mm.yyyy (npr. 05.06.2025)");
     noviTretman.value.datum_lijecenja = "";
   }
 }
@@ -147,10 +169,12 @@ function validateTimeFormat() {
 }
 
 function convertDateToBackendFormat(date) {
-  if (!date.includes('/')) return date;
-  const [day, month, year] = date.split("/");
+  if (!date.includes(".")) return date;
+
+  const [day, month, year] = date.split(".");
   return `${year}-${month}-${day}`;
 }
+
 
 function formatDate(isoDate) {
   if (!isoDate) return "";
@@ -209,21 +233,19 @@ async function fetchTermini() {
     });
 
     if (!response.ok) {
-      console.error("Greška pri dohvaćanju termina:", await response.text());
+      console.error("❌ Greška pri dohvaćanju termina:", await response.text());
       return;
     }
-
     const data = await response.json();
     terminiOptions.value = data.map(t => ({
       label: `${formatDate(t.datum_termina)} u ${formatTime(t.vrijeme_termina)}`,
-      value: t.SIFRA_TERMINA
+      value: t.SIFRA_TERMINA,
+      SIFRA_LJUBIMCA: t.SIFRA_LJUBIMCA ? Number(t.SIFRA_LJUBIMCA) : null
     }));
-
   } catch (err) {
-    console.error("Greška pri dohvaćanju termina:", err);
+    console.error("❌ Greška pri dohvaćanju termina:", err);
   }
 }
-
 
 // 📌 **Slanje unesenog tretmana na backend**
 async function submitTretman() {
@@ -247,8 +269,6 @@ async function submitTretman() {
       console.error("Greška pri unosu tretmana:", await response.text());
       return;
     }
-
-    console.log("Tretman uspješno unesen!");
     showTretmanDialog.value = false;
     fetchTretmaniVeterinara(); // Osvježi prikaz tretmana
 

@@ -88,19 +88,6 @@
               class="full-width card-btn"
             />
             </div>
-
-            <div class="info-card">
-            <q-icon name="event" size="lg" class="section-icon" />
-            <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">TRETMANI</h2>
-            <q-btn
-              unelevated
-              label="Pogledaj tretmane"
-              color="white"
-              text-color="dark"
-              to="/tretmani"
-              class="full-width card-btn"
-            />
-          </div>
           <div class="info-card">
             <q-icon name="event" size="lg" class="section-icon" />
             <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">DOKUMENTI</h2>

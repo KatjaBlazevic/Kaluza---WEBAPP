@@ -27,14 +27,15 @@
                   <q-icon name="event" class="q-mr-sm" />
                   Termin za: {{ t.ime_ljubimca }}
                 </h3>
-<p class="termin-details q-mt-xs text-grey-8">
-  <q-icon name="person" class="q-mr-xs" /> Veterinar: {{ t.ime_veterinara }} {{ t.prezime_veterinara }} ({{ t.specijalizacija_veterinara }})
-</p>
-                <p class="termin-datetime flex items-center q-mt-sm">
-  <q-icon name="calendar_today" class="q-mr-sm" />
-  {{ formatDate(t.datum_termina) }} u {{ formatTime(t.vrijeme_termina) }}
-</p>
 
+                <p class="termin-details q-mt-xs text-grey-8">
+                  <q-icon name="person" class="q-mr-xs" /> Veterinar: {{ t.ime_veterinara }} {{ t.prezime_veterinara }} ({{ t.specijalizacija_veterinara }})
+                </p>
+
+                <p class="termin-datetime flex items-center q-mt-sm">
+                  <q-icon name="calendar_today" class="q-mr-sm" />
+                  {{ formatDate(t.datum_termina) }} u {{ formatTime(t.vrijeme_termina) }}
+                </p>
 
                 <p class="termin-description q-mt-sm text-grey-8">
                   Simptomi: {{ t.simptomi_ljubimca }}
@@ -48,6 +49,7 @@
                 <div class="termin-actions q-mt-md flex justify-around">
                   <q-btn flat dense icon="edit" label="Uredi" color="primary" @click="openEditDialog(t)" />
                   <q-btn flat dense icon="cancel" label="Otkaži" color="negative" @click="cancelTermin(t.SIFRA_TERMINA)" v-if="t.status_termina === 'Pending'" />
+                  <q-btn flat dense icon="medical_services" label="Pogledaj tretmane" color="primary" @click="fetchTretmaniZaTermin(t.SIFRA_TERMINA)" />
                 </div>
               </q-card-section>
             </div>
@@ -74,45 +76,45 @@
 
         <q-card-section class="q-pt-none">
           <q-form @submit="submitTermin" class="q-gutter-md">
-<q-select
-  outlined
-  v-model="selectedLjubimac"
-  :options="ljubimciOptions"
-  label="Odaberi ljubimca"
-  emit-value
-  map-options
-  :rules="[val => !!val || 'Molimo odaberite ljubimca']"
-/>
+            <q-select
+              outlined
+              v-model="selectedLjubimac"
+              :options="ljubimciOptions"
+              label="Odaberi ljubimca"
+              emit-value
+              map-options
+              :rules="[val => !!val || 'Molimo odaberite ljubimca']"
+            />
 
-<q-select
-  outlined
-  v-model="selectedVeterinar"
-  :options="veterinariOptions"
-  label="Odaberi veterinara"
-  emit-value
-  map-options
-  :rules="[val => !!val || 'Molimo odaberite veterinara']"
-/>
+            <q-select
+              outlined
+              v-model="selectedVeterinar"
+              :options="veterinariOptions"
+              label="Odaberi veterinara"
+              emit-value
+              map-options
+              :rules="[val => !!val || 'Molimo odaberite veterinara']"
+            />
 
-<q-input
-  outlined
-  v-model="termin.datum_termina"
-  label="Datum termina"
-  placeholder="dd/mm/yyyy"
-  mask="##/##/####"
-  fill-mask
-  @blur="validateDateFormat"
-/>
+            <q-input
+              outlined
+              v-model="termin.datum_termina"
+              label="Datum termina"
+              placeholder="dd.mm.yyyy"
+              mask="##.##.####"
+              fill-mask
+              @blur="validateDateFormat"
+            />
 
-<q-input
-  outlined
-  v-model="termin.vrijeme_termina"
-  label="Vrijeme termina"
-  placeholder="hh:mm"
-  mask="##:##"
-  fill-mask
-  @blur="validateTimeFormat"
-/>
+            <q-input
+              outlined
+              v-model="termin.vrijeme_termina"
+              label="Vrijeme termina"
+              placeholder="hh:mm"
+              mask="##:##"
+              fill-mask
+              @blur="validateTimeFormat"
+            />
 
             <q-input outlined v-model="termin.simptomi_ljubimca" label="Simptomi ljubimca" type="textarea" rows="3"/>
             <q-input outlined v-model="termin.razlog_posjete" label="Razlog posjete" type="textarea" rows="2"/>
@@ -126,29 +128,34 @@
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="showEditDialog">
+    <q-dialog v-model="showTretmaniDialog">
       <q-card style="width: 700px; max-width: 80vw;">
         <q-card-section>
-          <div class="text-h6">Uredi Termin</div>
+          <div class="text-h6">Tretmani vaših ljubimaca</div>
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <q-form @submit="submitEditTermin" class="q-gutter-md">
-            <q-input outlined v-model="currentTermin.datum_termina" label="Datum termina" type="date"/>
-            <q-input outlined v-model="currentTermin.vrijeme_termina" label="Vrijeme termina" type="time"/>
-            <q-input outlined v-model="currentTermin.simptomi_ljubimca" label="Simptomi ljubimca" type="textarea" rows="3"/>
-            <q-input outlined v-model="currentTermin.razlog_posjete" label="Razlog posjete" type="textarea" rows="2"/>
-
-            <div class="flex justify-center q-mt-lg">
-              <q-btn label="Spremi promjene" type="submit" color="primary" unelevated size="lg"/>
-              <q-btn label="Odustani" color="negative" flat class="q-ml-sm" @click="showEditDialog = false" />
-            </div>
-          </q-form>
+          <div v-if="prikazaniTretmani.length > 0">
+            <q-list bordered separator>
+              <q-item v-for="tretman in prikazaniTretmani" :key="tretman.SIFRA_TRETMANA">
+                <q-item-section>
+                  <q-item-label><strong>Ljubimac:</strong> {{ tretman.ime_ljubimca }}</q-item-label>
+                  <q-item-label><strong>Datum liječenja:</strong> {{ formatDate(tretman.datum_lijecenja) }}</q-item-label>
+                  <q-item-label><strong>Vrijeme liječenja:</strong> {{ formatTime(tretman.vrijeme_lijecenja) }}</q-item-label>
+                  <q-item-label><strong>Bolest:</strong> {{ tretman.bolest_ljubimca }}</q-item-label>
+                  <q-item-label><strong>Terapija:</strong> {{ tretman.lijecenje_ljubimca }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </div>
+          <p v-else class="text-center text-grey-6">Nema tretmana za ovaj termin.</p>
         </q-card-section>
       </q-card>
     </q-dialog>
+
   </q-page>
 </template>
+
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
@@ -167,16 +174,16 @@ const termin = ref({
 
 const selectedLjubimac = ref(null);
 const ljubimciOptions = ref([]);
-
 const selectedVeterinar = ref(null);
 const veterinariOptions = ref([]);
-
 const korisnikoviTermini = ref([]);
 const searchQuery = ref('');
 const showAll = ref(false); // Za prikaz više/manje kartica termina
 const showScheduleDialog = ref(false); // Kontrola vidljivosti dialoga za zakazivanje
 const showEditDialog = ref(false); // ✅ Dodano
 const currentTermin = ref(null); // ✅ Dodano za uređivanje termina
+const prikazaniTretmani = ref([]);
+const showTretmaniDialog = ref(false);
 
 async function fetchUserProfile() {
   try {
@@ -206,16 +213,18 @@ function validateTimeFormat() {
 }
 
 function validateDateFormat() {
-  const regex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
+  const regex = /^(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[0-2])\.\d{4}$/;
   if (!regex.test(termin.value.datum_termina)) {
-    alert("Molimo unesite datum u formatu dd/mm/yyyy (npr. 05/06/2025)");
+    alert("Molimo unesite datum u formatu dd.mm.yyyy (npr. 05.06.2025)");
     termin.value.datum_termina = "";
   }
 }
 
 function convertDateToBackendFormat(date) {
-  const [day, month, year] = date.split("/");
-  return `${year}-${month}-${day}`; // Pretvara DD/MM/YYYY → YYYY-MM-DD
+  if (!date.includes(".")) return date;
+
+  const [day, month, year] = date.split(".");
+  return `${year}-${month}-${day}`;
 }
 
 function formatDate(date) {
@@ -382,6 +391,30 @@ async function fetchKorisnikoviTermini() {
     });
   }
 }
+
+async function fetchTretmaniZaTermin(terminId) {
+  try {
+    const response = await fetch(`http://localhost:3000/tretmani/termin/${terminId}/${userStore.SIFRA_KORISNIKA}`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      console.error("Greška pri dohvaćanju tretmana:", await response.text());
+      return;
+    }
+
+    const data = await response.json();
+
+    prikazaniTretmani.value = data;
+    showTretmaniDialog.value = true;
+
+  } catch (err) {
+    console.error("Greška pri dohvaćanju tretmana:", err);
+  }
+}
+
+
 
 // Funkcija za slanje termina
 async function submitTermin() {
