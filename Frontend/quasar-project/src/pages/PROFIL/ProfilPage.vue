@@ -129,17 +129,15 @@ const userStore = useUserStore()
 
 async function fetchProfile() {
   try {
-    const res = await fetch('http://localhost:3000/profile', {
-      credentials: 'include'
-    });
+    const res = await fetch('http://localhost:3000/profile', { credentials: 'include' });
 
     if (!res.ok) {
-      router.push('/prijava');
+      router.push('/prijava'); // Ako nema sesije, preusmjeri na prijavu
       return;
     }
 
     const data = await res.json();
-    userStore.setUser(data);
+    userStore.setUser(data); // Postavi korisnika u store
   } catch (err) {
     console.error('Greška prilikom dohvata profila:', err);
     router.push('/prijava');
@@ -147,6 +145,7 @@ async function fetchProfile() {
     loading.value = false;
   }
 }
+
 
 async function logout() {
   try {

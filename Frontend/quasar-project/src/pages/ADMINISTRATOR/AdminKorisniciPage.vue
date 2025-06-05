@@ -85,8 +85,34 @@ onMounted(fetchKorisnici);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: start;
-  padding-top: 40px;
+  justify-content: top; /* Centriramo sadržaj */
+  height: 100vh; /* Oduzima cijelu visinu ekrana */
+}
+
+.q-table {
+  max-width: 80%; /* Povećava širinu tablice */
+  font-size: 16px; /* Veći font za bolju čitljivost */
+}
+
+.q-table th,
+.q-table td {
+  padding: 16px; /* Povećava razmak između redova */
+  text-align: center; /* Poravnava tekst */
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--q-primary);
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+p {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--q-primary);
+  text-align: center;
 }
 
 h1 {

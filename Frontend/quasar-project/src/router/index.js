@@ -2,42 +2,47 @@ import { createRouter, createWebHistory } from 'vue-router';
 import routes from './routes';
 
 // Funkcija za provjeru prijave (koristi /api/check-session rutu)
-async function isAuthenticated() {
+async function getUserRole() {
   try {
-    const res = await fetch('http://localhost:3000/api/check-session', {
-      credentials: 'include' // Ključno za slanje cookieja sesije
-    });
+    const res = await fetch('http://localhost:3000/api/check-session', { credentials: 'include' });
     const data = await res.json();
-    return data.authenticated === true;
+    return data.role || null; // Dobivamo rolu korisnika (korisnik, veterinar, admin)
   } catch (err) {
-    console.error('Greška pri provjeri autentičnosti:', err); // Dodaj log za debugging
-    return false;
+    console.error('Greška pri provjeri autentičnosti:', err);
+    return null;
   }
 }
 
 // KLJUČNO: Exportira se FUNKCIJA koja vraća instancu routera
-export default function (/* { store, ssrContext } */) {
+export default function () {
   const Router = createRouter({
     scrollBehavior: () => ({ left: 0, top: 0 }),
     routes,
-    // Koristi createWebHistory s process.env.VUE_ROUTER_BASE za ispravan rad u Quasaru
     history: createWebHistory(process.env.VUE_ROUTER_BASE)
   });
 
-  // Global Navigation Guard
+  // Global Navigation Guard za zaštitu ruta
   Router.beforeEach(async (to, from, next) => {
-    if (to.meta.requiresAuth) {
-      const auth = await isAuthenticated();
-      if (auth) {
-        next();
-      } else {
-        // console.log('Korisnik nije prijavljen, preusmjeravanje na prijavu.'); // Debugging
-        next('/prijava'); // Preusmjeri na stranicu za prijavu ako nije autentificiran
-      }
-    } else {
-      next(); // Nastavi normalno ako ruta ne zahtijeva autentifikaciju
+    const role = await getUserRole();
+
+    if (to.meta.requiresAuth && !role) {
+      return next('/prijava');
     }
+
+    if (to.meta.requiresKorisnik && role !== 'korisnik') {
+      return next('/');
+    }
+
+    if (to.meta.requiresVeterinar && role !== 'veterinar') {
+      return next('/');
+    }
+
+    if (to.meta.requiresAdmin && role !== 'admin') {
+      return next('/');
+    }
+
+    next();
   });
 
-  return Router; // Vrati instancu routera
+  return Router;
 }

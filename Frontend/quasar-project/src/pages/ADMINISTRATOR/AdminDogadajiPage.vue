@@ -15,6 +15,7 @@
         dense
         bordered
         class="q-mt-md"
+        :pagination="pagination"
         >
         <template v-slot:body-cell-akcije="props">
           <q-td :props="props">
@@ -60,6 +61,9 @@ const dialogOtvoren = ref(false);
 const trenutniDogadaj = ref(null);
 const prikaziSamoAktivne = ref(false);
 const prikaziProsleDogadaje = ref(false);
+const pagination = ref({
+  rowsPerPage: 4,
+});
 const dogadaj = ref({
   naziv_dogadaja: "",
   vrsta_dogadaja: "",
@@ -172,7 +176,6 @@ onMounted(fetchDogadaji);
   flex-direction: column;
   align-items: center;
   justify-content: start;
-  padding-top: 40px;
 }
 
 .gumb-container {

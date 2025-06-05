@@ -57,6 +57,7 @@ const pretraga = ref("");
 const veterinari = ref([]);
 const dialogOtvoren = ref(false);
 const trenutniVeterinar = ref(null);
+
 const veterinar = ref({
   ime_veterinara: "",
   prezime_veterinara: "",
@@ -149,7 +150,6 @@ onMounted(fetchVeterinari);
   flex-direction: column;
   align-items: center;
   justify-content: start;
-  padding-top: 40px;
 }
 
 .gumb-container {
