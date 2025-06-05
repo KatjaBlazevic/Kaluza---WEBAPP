@@ -7,7 +7,7 @@
         <q-input filled v-model="ime" label="Ime" />
         <q-input filled v-model="prezime" label="Prezime" />
         <q-input filled v-model="email" label="Email" type="email" />
-        <q-input filled v-model="lozinka" label="Nova lozinka" type="password" />
+        <q-input filled v-model="lozinka" label="Nova lozinka" type="password" hint="Ostavite prazno za nepromijenjenu lozinku." />
         <div class="text-center">
           <q-btn label="Spremi promjene" color="primary" type="submit" unelevated />
         </div>
@@ -15,6 +15,9 @@
 
       <div v-if="poruka" class="text-positive text-center q-mt-md">
         {{ poruka }}
+      </div>
+      <div v-if="errorMsg" class="text-negative text-center q-mt-md">
+        {{ errorMsg }}
       </div>
     </q-card>
   </q-page>
@@ -33,55 +36,114 @@ const prezime = ref('')
 const email = ref('')
 const lozinka = ref('')
 const poruka = ref('')
+const errorMsg = ref('');
 
 async function fetchProfile() {
   try {
-    const res = await fetch('http://localhost:3000/profile', { credentials: 'include' });
-
-    if (!res.ok) {
+    const token = localStorage.getItem('token');
+    if (!token) {
       router.push('/prijava');
       return;
     }
+
+    const res = await fetch('http://localhost:3000/profile', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      return;
+    }
+
     const data = await res.json();
-    console.log('🔍 Ažurirani profil:', data); // ✅ Provjera u konzoli
+    console.log('Dohvaćeni profil:', data);
+
+    ime.value = data.ime;
+    prezime.value = data.prezime;
+    email.value = data.email;
+
     userStore.setUser(data);
+
   } catch (err) {
     console.error('Greška prilikom dohvaćanja profila:', err);
+    localStorage.removeItem('token');
+    userStore.clearUser();
     router.push('/prijava');
   }
 }
 
 async function updateProfile() {
+  poruka.value = '';
+  errorMsg.value = '';
+
   try {
-    const body = { ime: ime.value, prezime: prezime.value, email: email.value };
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/prijava');
+      return;
+    }
+
+    const body = {
+      ime: ime.value,
+      prezime: prezime.value,
+      email: email.value
+    };
+
+    if (lozinka.value) {
+      body.lozinka = lozinka.value;
+    }
 
     const res = await fetch('http://localhost:3000/update-profile', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(body)
     });
 
-    if (!res.ok) throw new Error('Greška prilikom ažuriranja profila');
     const data = await res.json();
 
-    if (data.user) {
-      userStore.setUser({ ime: data.user.ime, prezime: data.user.prezime });
+    if (!res.ok) {
+      throw new Error(data.error || 'Greška prilikom ažuriranja profila');
+    }
 
-      // ✅ Forsiramo novo dohvaćanje profila
-      await fetchProfile();
-
-      // ✅ Nakon ažuriranja, preusmjeravamo korisnika na `/profile`
-      router.push('/profile');
+    if (data.token) {
+      userStore.setUser({
+        id: data.user.id,
+        ime: data.user.ime,
+        prezime: data.user.prezime,
+        email: data.user.email,
+        role: userStore.role,
+        token: data.token
+      });
+    } else {
+      userStore.setUser({
+        ...userStore.$state,
+        ime: data.user.ime,
+        prezime: data.user.prezime,
+        email: data.user.email
+      });
     }
 
     poruka.value = 'Profil je uspješno ažuriran!';
+    // Dodana linija za preusmjeravanje
+    router.push('/profile');
+
   } catch (err) {
     console.error(err);
-    poruka.value = 'Došlo je do pogreške. Pokušajte ponovno.';
+    errorMsg.value = err.message || 'Došlo je do pogreške. Pokušajte ponovno.';
+    if (err.message.includes('token') || err.message.includes('prijavljen')) {
+        localStorage.removeItem('token');
+        userStore.clearUser();
+        router.push('/prijava');
+    }
   }
 }
-
 
 onMounted(fetchProfile);
 </script>
@@ -91,8 +153,8 @@ onMounted(fetchProfile);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center; /* Centrirano na ekranu */
-  min-height: 100vh; /* Osigurava da stranica zauzima cijeli ekran */
+  justify-content: center;
+  min-height: 100vh;
 }
 
 .uredi-title{

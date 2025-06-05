@@ -5,7 +5,6 @@
     </div>
 
     <div v-else>
-      <!-- Hero sekcija -->
       <div class="hero-section flex flex-center">
         <div class="hero-content text-center text-white">
           <h1 class="hero-title">
@@ -34,7 +33,6 @@
         </div>
       </div>
 
-      <!-- Glavni sadržaj -->
       <div class="main-content">
         <div class="row justify-center q-gutter-xl q-mb-xl">
           <div class="info-card">
@@ -76,7 +74,7 @@
             />
           </div>
 
-            <div class="info-card">
+          <div class="info-card">
             <q-icon name="event" size="lg" class="section-icon" />
             <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">TERMINI</h2>
             <q-btn
@@ -87,7 +85,7 @@
               to="/termin"
               class="full-width card-btn"
             />
-            </div>
+          </div>
           <div class="info-card">
             <q-icon name="event" size="lg" class="section-icon" />
             <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">DOKUMENTI</h2>
@@ -102,7 +100,6 @@
           </div>
         </div>
 
-        <!-- Gumb za odjavu -->
         <div class="text-center q-mt-xl">
           <q-btn
             unelevated
@@ -129,10 +126,26 @@ const userStore = useUserStore()
 
 async function fetchProfile() {
   try {
-    const res = await fetch('http://localhost:3000/profile', { credentials: 'include' });
+    // ⚠️ ISPRAVKA 1: Ukloni credentials: 'include' jer koristimo JWT iz localStorage
+    const token = localStorage.getItem('token');
+    if (!token) {
+        router.push('/prijava'); // Ako nema tokena, preusmjeri na prijavu
+        return;
+    }
+
+    const res = await fetch('http://localhost:3000/profile', {
+      method: 'GET', // Metoda je obično GET za dohvat profila
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` // ⬅️ DODANO: Šalji JWT u Authorization headeru
+      }
+    });
 
     if (!res.ok) {
-      router.push('/prijava'); // Ako nema sesije, preusmjeri na prijavu
+      // Ako backend vrati 401 (Unauthorized) ili 403 (Forbidden), preusmjeri na prijavu
+      // Ovo znači da je token nevažeći ili istekao
+      localStorage.removeItem('token'); // Ukloni nevažeći token
+      router.push('/prijava');
       return;
     }
 
@@ -140,30 +153,32 @@ async function fetchProfile() {
     userStore.setUser(data); // Postavi korisnika u store
   } catch (err) {
     console.error('Greška prilikom dohvata profila:', err);
+    // U slučaju mrežne greške ili bilo koje druge greške, preusmjeri na prijavu
+    localStorage.removeItem('token'); // Ukloni token jer je možda problem s vezom
     router.push('/prijava');
   } finally {
     loading.value = false;
   }
 }
 
-
 async function logout() {
   try {
-    await fetch('http://localhost:3000/logout', {
-      method: 'POST',
-      credentials: 'include'
-    });
-    userStore.clearUser();
+    // ⚠️ ISPRAVKA 2: Ukloni credentials: 'include' i ne treba ti fetch zahtjev za logout ako je samo JWT.
+    // Dovoljno je obrisati token iz localStorage.
+    localStorage.removeItem('token'); // Briše token iz localStorage
+    userStore.clearUser(); // Briše korisničke podatke iz storea
   } catch (err) {
     console.error('Greška prilikom odjave:', err);
+    // Iako ovdje neće biti greške, zadržavamo catch blok za dosljednost
   }
-  router.push('/prijava');
+  router.push('/prijava'); // Preusmjeri na prijavu nakon odjave
 }
 
 onMounted(fetchProfile);
 </script>
 
 <style scoped>
+/* Tvoj CSS ostaje nepromijenjen */
 .profile-page {
   background-color: white;
 }

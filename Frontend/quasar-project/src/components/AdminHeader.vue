@@ -1,36 +1,31 @@
 <template>
   <q-header elevated class="bg-primary text-white">
     <q-toolbar class="header-toolbar">
-      <!-- Lijevo - Logo -->
       <div class="header-left">
         <span class="text-h5">Admin Panel</span>
       </div>
 
-      <!-- Sredina - Navigacija -->
       <div class="header-center gt-sm">
+        <q-btn flat label="Dashboard" to="/admin" class="text-button" />
         <q-btn flat label="Korisnici" to="/admin/korisnici" class="text-button" />
         <q-btn flat label="Događaji" to="/admin/dogadaji" class="text-button" />
         <q-btn flat label="Veterinari" to="/admin/veterinari" class="text-button" />
       </div>
 
-      <!-- Desno - Odjava -->
       <div class="header-right gt-sm">
         <q-btn flat icon="logout" label="Odjava" @click="logout" class="text-button" />
       </div>
 
-      <!-- Mobilni meni ikona -->
       <q-btn
         flat
         round
         dense
         icon="menu"
-        class="lt-md"
-        @click="toggleLeftDrawer"
+        class="lt-md q-ml-auto" @click="toggleLeftDrawer"
         aria-label="Glavni meni"
       />
     </q-toolbar>
 
-    <!-- Mobilni drawer meni -->
     <q-drawer
       v-model="leftDrawerOpen"
       side="left"
@@ -46,13 +41,11 @@
 
           <q-item
             v-for="link in links"
-            :key="link.to"
-            clickable
+            :key="link.to || link.label" clickable
             v-ripple
             :to="link.to"
-            class="text-white q-my-xs"
+            @click="link.action ? link.action() : toggleLeftDrawer()" class2="text-white q-my-xs"
             active-class="active-menu-item"
-            @click="toggleLeftDrawer"
           >
             <q-item-section>{{ link.label }}</q-item-section>
           </q-item>
@@ -65,11 +58,15 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from "vue-router";
+import { useUserStore } from 'src/stores/user'; // Uvezi Pinia store
 
 const router = useRouter();
+const userStore = useUserStore(); // Inicijaliziraj user store
+
 const leftDrawerOpen = ref(false);
 
 const links = [
+  { label: 'Dashboard', to: '/admin' },
   { label: 'Korisnici', to: '/admin/korisnici' },
   { label: 'Događaji', to: '/admin/dogadaji' },
   { label: 'Veterinari', to: '/admin/veterinari' },
@@ -81,9 +78,12 @@ const toggleLeftDrawer = () => {
 };
 
 function logout() {
-  fetch("http://localhost:3000/logout", { method: "POST", credentials: "include" })
-    .then(() => router.push("/prijava"))
-    .catch((err) => console.error("❌ Greška pri odjavi:", err));
+  userStore.clearUser(); // Koristimo Pinia store za odjavu
+  router.push("/prijava");
+  // Zatvori drawer nakon odjave ako je otvoren
+  if (leftDrawerOpen.value) {
+    leftDrawerOpen.value = false;
+  }
 }
 </script>
 
@@ -131,12 +131,23 @@ function logout() {
 /* Responsivne prilagodbe */
 @media (max-width: 1023px) {
   .header-toolbar {
+    /* Promjena grid template columns na manjim ekranima */
+    /* Automatski će gurnuti zadnji element skroz desno ako je ostali prostor slobodan */
+    grid-template-columns: auto 1fr auto; /* Logo, prazan prostor, hamburger */
     padding: 0 20px;
-    grid-template-columns: auto 1fr auto;
+  }
+
+  /* Osigurajte da mobilni meni gumb bude zadnji vizualno */
+  .lt-md {
+    order: 3; /* Postavlja hamburger gumb da bude zadnji element u redu */
+  }
+
+  .header-left {
+    order: 1; /* Postavlja logo da bude prvi */
   }
 
   .header-center, .header-right {
-    display: none;
+    display: none; /* Skriva desktop navigaciju */
   }
 }
 

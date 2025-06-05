@@ -45,7 +45,6 @@
             </div>
           </div>
 
-          <!-- Dugme za prikaz više/manje -->
           <div class="q-mt-lg text-center">
             <q-btn v-if="filteredTretmani.length > 3" @click="toggleShowAllTretmani" flat color="primary">
               {{ showAllTretmani ? 'Prikaži manje' : 'Prikaži više' }}
@@ -79,7 +78,7 @@
             <q-select
               outlined
               v-model="noviTretman.SIFRA_TERMINA"
-              :options="filteredTermini"
+              :options="filteredTerminiOptions"
               label="Odaberi termin"
               emit-value
               map-options
@@ -122,13 +121,15 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 
+const router = useRouter();
 const userStore = useUserStore();
+
 const tretmani = ref([]);
 const searchQuery = ref('');
 const showTretmanDialog = ref(false);
-const odabraniLjubimac = ref(null);
 const noviTretman = ref({
   datum_lijecenja: '',
   vrijeme_lijecenja: '',
@@ -141,7 +142,7 @@ const ljubimciOptions = ref([]);
 const terminiOptions = ref([]);
 const showAllTretmani = ref(false);
 
-const filteredTermini = computed(() => {
+const filteredTerminiOptions = computed(() => {
   if (!noviTretman.value.SIFRA_LJUBIMCA) return [];
   return terminiOptions.value.filter(t => t.SIFRA_LJUBIMCA === noviTretman.value.SIFRA_LJUBIMCA);
 });
@@ -150,12 +151,10 @@ function toggleShowAllTretmani() {
   showAllTretmani.value = !showAllTretmani.value;
 }
 
-
-
 function validateDateFormat() {
   const regex = /^(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[0-2])\.\d{4}$/;
   if (!regex.test(noviTretman.value.datum_lijecenja)) {
-    alert("Molimo unesite datum u formatu dd.mm.yyyy (npr. 05.06.2025)");
+    console.error("Molimo unesite datum u formatu dd.mm.yyyy (npr. 05.06.2025)");
     noviTretman.value.datum_lijecenja = "";
   }
 }
@@ -163,18 +162,17 @@ function validateDateFormat() {
 function validateTimeFormat() {
   const regex = /^([01]\d|2[0-3]):([0-5]\d)$/;
   if (!regex.test(noviTretman.value.vrijeme_lijecenja)) {
-    alert("Molimo unesite vrijeme u formatu HH:mm (npr. 14:30)");
+    console.error("Molimo unesite vrijeme u formatu HH:mm (npr. 14:30)");
     noviTretman.value.vrijeme_lijecenja = "";
   }
 }
 
 function convertDateToBackendFormat(date) {
-  if (!date.includes(".")) return date;
+  if (!date || !date.includes(".")) return date;
 
   const [day, month, year] = date.split(".");
   return `${year}-${month}-${day}`;
 }
-
 
 function formatDate(isoDate) {
   if (!isoDate) return "";
@@ -192,106 +190,195 @@ const filteredTretmani = computed(() => {
   const query = searchQuery.value.toLowerCase();
   return tretmani.value.filter(t =>
     (t.ime_ljubimca && t.ime_ljubimca.toLowerCase().includes(query)) ||
-    (t.bolest_ljubimca && t.bolest_ljubimca.toLowerCase().includes(query)) ||
+    (t.bolest_ljubimca && t.bolest_ljubimca.toLowerCase().includes(query)) || // Ispravljeno: bolimca -> bolest_ljubimca
     (t.lijecenje_ljubimca && t.lijecenje_ljubimca.toLowerCase().includes(query))
   );
 });
 
-function openTretmanDialog() {
+async function openTretmanDialog() {
+  if (!userStore.isAuthenticated || userStore.getUserRole !== 'veterinar') {
+    console.warn('Pristup odbijen: Nemate dozvolu za unos tretmana. Prijavite se kao veterinar.');
+    router.push('/prijava');
+    return;
+  }
   showTretmanDialog.value = true;
-  fetchLjubimci();
-  fetchTermini();
+  noviTretman.value = {
+    datum_lijecenja: '',
+    vrijeme_lijecenja: '',
+    bolest_ljubimca: '', // Prazno po defaultu
+    lijecenje_ljubimca: '', // Prazno po defaultu
+    SIFRA_LJUBIMCA: null,
+    SIFRA_TERMINA: null
+  };
+  await fetchLjubimci();
+  await fetchTermini();
 }
 
-// 📌 **Dohvat ljubimaca korisnika ili veterinara**
 async function fetchLjubimci() {
+  if (!userStore.isAuthenticated || userStore.getUserRole !== 'veterinar') {
+      console.warn('Pristup odbijen: Korisnik nije veterinar ili nije prijavljen.');
+      return;
+  }
+  const token = userStore.token;
+
   try {
-    const response = await fetch(`http://localhost:3000/moji-ljubimci`, {
+    // ✅ URL za dohvat svih ljubimaca koje veterinar može vidjeti
+    const response = await fetch(`http://localhost:3000/veterinar/moji-ljubimci`, {
       method: "GET",
-      credentials: "include",
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
     });
 
+    if (response.status === 403 || response.status === 401) {
+        console.error('Vaša sesija je istekla ili nemate dozvolu. Molimo prijavite se ponovno.');
+        userStore.clearUser();
+        router.push('/prijava');
+        return;
+    }
+
     if (!response.ok) {
-      console.error("Greška pri dohvaćanju ljubimaca:", await response.text());
+      const errorText = await response.text();
+      console.error("Greška pri dohvaćanju ljubimaca:", response.status, errorText);
       return;
     }
 
     const data = await response.json();
-    ljubimciOptions.value = data.map(l => ({ label: l.ime_ljubimca, value: l.SIFRA_LJUBIMCA }));
+    ljubimciOptions.value = data.map(l => ({ label: `${l.ime_ljubimca} (Vlasnik: ${l.ime_korisnika || ''} ${l.prezime_korisnika || ''})`, value: l.SIFRA_LJUBIMCA }));
 
   } catch (err) {
     console.error("Greška pri dohvaćanju ljubimaca:", err);
   }
 }
 
-// 📌 **Dohvat termina korisnika ili veterinara**
 async function fetchTermini() {
+  if (!userStore.isAuthenticated || userStore.getUserRole !== 'veterinar') {
+      console.warn('Pristup odbijen: Korisnik nije veterinar ili nije prijavljen.');
+      return;
+  }
+  const token = userStore.token;
+
   try {
-    const response = await fetch(`http://localhost:3000/termin`, {
+    const response = await fetch(`http://localhost:3000/veterinar/termini`, {
       method: "GET",
-      credentials: "include",
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
     });
 
+    if (response.status === 403 || response.status === 401) {
+        console.error('Vaša sesija je istekla ili nemate dozvolu. Molimo prijavite se ponovno.');
+        userStore.clearUser();
+        router.push('/prijava');
+        return;
+    }
+
     if (!response.ok) {
-      console.error("❌ Greška pri dohvaćanju termina:", await response.text());
+      const errorText = await response.text();
+      console.error("❌ Greška pri dohvaćanju termina:", response.status, errorText);
       return;
     }
     const data = await response.json();
     terminiOptions.value = data.map(t => ({
-      label: `${formatDate(t.datum_termina)} u ${formatTime(t.vrijeme_termina)}`,
+      label: `Termin za ${t.ime_ljubimca} - ${formatDate(t.datum_termina)} u ${formatTime(t.vrijeme_termina)}`,
       value: t.SIFRA_TERMINA,
-      SIFRA_LJUBIMCA: t.SIFRA_LJUBIMCA ? Number(t.SIFRA_LJUBIMCA) : null
+      SIFRA_LJUBIMCA: t.SIFRA_LJUBIMCA
     }));
   } catch (err) {
     console.error("❌ Greška pri dohvaćanju termina:", err);
   }
 }
 
-// 📌 **Slanje unesenog tretmana na backend**
 async function submitTretman() {
-  if (!noviTretman.value.SIFRA_LJUBIMCA || !noviTretman.value.SIFRA_TERMINA) {
-    console.error("❌ Morate odabrati ljubimca i termin!");
+  if (!userStore.isAuthenticated || userStore.getUserRole !== 'veterinar') {
+    console.warn('Nemate dozvolu za spremanje tretmana. Prijavite se kao veterinar.');
+    router.push('/prijava');
     return;
   }
 
-  // ✅ Konvertiraj datum u `YYYY-MM-DD` prije slanja!
-  noviTretman.value.datum_lijecenja = convertDateToBackendFormat(noviTretman.value.datum_lijecenja);
+  // Provjera obaveznih polja (ljubimac, termin, datum, vrijeme)
+  if (!noviTretman.value.SIFRA_LJUBIMCA || !noviTretman.value.SIFRA_TERMINA) {
+    console.error("Molimo odaberite ljubimca i termin!");
+    return;
+  }
+
+  validateDateFormat();
+  validateTimeFormat();
+  if (noviTretman.value.datum_lijecenja === "" || noviTretman.value.vrijeme_lijecenja === "") {
+      return;
+  }
+
+  const payload = {
+    ...noviTretman.value,
+    datum_lijecenja: convertDateToBackendFormat(noviTretman.value.datum_lijecenja),
+    // Osiguravamo da se prazni stringovi šalju ako polja nisu popunjena
+    bolest_ljubimca: noviTretman.value.bolest_ljubimca || '',
+    lijecenje_ljubimca: noviTretman.value.lijecenje_ljubimca || ''
+  };
+  const token = userStore.token;
 
   try {
-    const response = await fetch(`http://localhost:3000/tretmani/veterinar/${userStore.SIFRA_VETERINARA}`, {
+    const response = await fetch(`http://localhost:3000/tretmani`, { // Održavamo /tretmani kao POST rutu
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(noviTretman.value),
+      headers: {
+        "Content-Type": "application/json",
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload),
     });
 
+    if (response.status === 403 || response.status === 401) {
+        console.error('Vaša sesija je istekla ili nemate dozvolu za dodavanje tretmana. Molimo prijavite se ponovno.');
+        userStore.clearUser();
+        router.push('/prijava');
+        return;
+    }
+
     if (!response.ok) {
-      console.error("Greška pri unosu tretmana:", await response.text());
+      const errorData = await response.json();
+      console.error("Greška pri unosu tretmana:", response.status, errorData.message || response.statusText);
       return;
     }
+
+    console.log('Tretman uspješno unesen!');
     showTretmanDialog.value = false;
-    fetchTretmaniVeterinara(); // Osvježi prikaz tretmana
+    fetchTretmaniVeterinara(); // Osvježi listu tretmana nakon unosa
 
   } catch (err) {
     console.error("Greška pri unosu tretmana:", err);
   }
 }
 
-// 📌 **Dohvat tretmana za veterinara**
 async function fetchTretmaniVeterinara() {
-  if (!userStore.SIFRA_VETERINARA) {
-    console.error("Greška: SIFRA_VETERINARA je null!");
+  if (!userStore.isAuthenticated || userStore.getUserRole !== 'veterinar') {
+    console.warn('Nemate dozvolu za pristup ovoj stranici. Prijavite se kao veterinar.');
+    router.push('/prijava');
     return;
   }
 
+  const token = userStore.token;
+
   try {
-    const response = await fetch(`http://localhost:3000/tretmani/veterinar/${userStore.SIFRA_VETERINARA}`, {
+    const response = await fetch(`http://localhost:3000/tretmani/veterinar`, { // API ruta je /tretmani/veterinar
       method: "GET",
-      credentials: "include",
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
     });
 
+    if (response.status === 403 || response.status === 401) {
+        console.error('Vaša sesija je istekla ili nemate dozvolu. Molimo prijavite se ponovno.');
+        userStore.clearUser();
+        router.push('/prijava');
+        return;
+    }
+
     if (!response.ok) {
-      console.error("Greška pri dohvaćanju tretmana:", await response.text());
+      const errorText = await response.text();
+      console.error("Greška pri dohvaćanju tretmana:", response.status, errorText);
       return;
     }
 
@@ -303,16 +390,13 @@ async function fetchTretmaniVeterinara() {
   }
 }
 
-// 📌 **Inicijalni dohvat podataka**
 onMounted(() => {
   fetchTretmaniVeterinara();
-  fetchLjubimci();
-  fetchTermini();
 });
-
 </script>
 
 <style scoped>
+/* Vaši postojeći stilovi ostaju nepromijenjeni */
 .veterinar-tretmani-page {
   background-color: white;
 }

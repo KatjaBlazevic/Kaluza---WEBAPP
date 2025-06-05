@@ -1,48 +1,86 @@
-import { createRouter, createWebHistory } from 'vue-router';
-import routes from './routes';
+// src/router/index.js
+import { route } from 'quasar/wrappers';
+import { createRouter, createMemoryHistory, createWebHistory, createWebHashHistory } from 'vue-router';
+import routes from './routes'; // Import your routes
+import { useUserStore } from 'src/stores/user';
 
-// Funkcija za provjeru prijave (koristi /api/check-session rutu)
-async function getUserRole() {
-  try {
-    const res = await fetch('http://localhost:3000/api/check-session', { credentials: 'include' });
-    const data = await res.json();
-    return data.role || null; // Dobivamo rolu korisnika (korisnik, veterinar, admin)
-  } catch (err) {
-    console.error('Greška pri provjeri autentičnosti:', err);
-    return null;
-  }
-}
+export default route(function ({ store }) {
+  const createHistory = process.env.SERVER
+    ? createMemoryHistory
+    : (process.env.VUE_ROUTER_MODE === 'history' ? createWebHistory : createWebHashHistory);
 
-// KLJUČNO: Exportira se FUNKCIJA koja vraća instancu routera
-export default function () {
   const Router = createRouter({
     scrollBehavior: () => ({ left: 0, top: 0 }),
     routes,
-    history: createWebHistory(process.env.VUE_ROUTER_BASE)
+    history: createHistory(process.env.VUE_ROUTER_BASE),
   });
 
-  // Global Navigation Guard za zaštitu ruta
   Router.beforeEach(async (to, from, next) => {
-    const role = await getUserRole();
+    const userStore = useUserStore(store);
 
-    if (to.meta.requiresAuth && !role) {
-      return next('/prijava');
+    if (!userStore.isAuthenticated && localStorage.getItem('token')) {
+        console.log('Router Guard: Token found, but Pinia store not authenticated. Attempting to initialize user...');
+        await userStore.initializeUser();
     }
 
-    if (to.meta.requiresKorisnik && role !== 'korisnik') {
-      return next('/');
-    }
+    const isAuthenticated = userStore.isAuthenticated;
+    const userRole = userStore.getUserRole;
 
-    if (to.meta.requiresVeterinar && role !== 'veterinar') {
-      return next('/');
-    }
+    console.log(`Router Guard: Checking route: ${to.path} IsAuthenticated: ${isAuthenticated} UserRole: '${userRole}'`); // Dodan '' oko uloge
 
-    if (to.meta.requiresAdmin && role !== 'admin') {
-      return next('/');
-    }
+    const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 
-    next();
-  });
+    // ✅ KLJUČNA PROMJENA U LOGIRANJU requiredRole
+    let requiredRole = null;
+    const matchedWithRole = to.matched.find(record => record.meta.role);
+    if (matchedWithRole) {
+        requiredRole = matchedWithRole.meta.role;
+    }
+    console.log(`Router Guard: Route '${to.path}' meta.role: '${requiredRole}'`); // Dodan '' oko uloge
+
+    if (requiresAuth) {
+      if (!isAuthenticated) {
+        console.warn('Router Guard: Not authenticated. Redirecting to /prijava.');
+        next('/prijava');
+      } else {
+        // Korisnik je autentificiran, sada provjeri ulogu ako je ruta zahtijeva
+        if (requiredRole && userRole !== requiredRole) {
+          console.warn(`Router Guard: Permission denied for route '${to.path}'. Required role: '${requiredRole}', User role: '${userRole}'. Redirecting.`);
+
+          // Preusmjeri korisnika na odgovarajuću početnu stranicu/dashboard
+          if (userRole === 'korisnik') {
+            next('/profile');
+          } else if (userRole === 'veterinar') {
+            next('/profile-veterinar');
+          } else if (userRole === 'admin') {
+            next('/admin');
+          } else {
+            next('/');
+          }
+        } else {
+          // ✅ DODAJ OVAJ LOG KADA JE ULOGA USPJEŠNO PROVJERENA
+          console.log(`Router Guard: Permission GRANTED for route '${to.path}'. User role: '${userRole}', Required role: '${requiredRole}'.`);
+          next(); // Dozvoli pristup
+        }
+      }
+    } else {
+      // ... (ostatak koda za javne rute) ...
+      if (isAuthenticated && (to.path === '/prijava' || to.path === '/register' || to.path === '/izrada-profila' || to.path === '/dodaj-ljubimca')) {
+        console.warn('Router Guard: Logged in user trying to access login/registration related page. Redirecting to appropriate dashboard.');
+        if (userRole === 'korisnik') {
+          next('/profile');
+        } else if (userRole === 'veterinar') {
+          next('/profile-veterinar');
+        } else if (userRole === 'admin') {
+          next('/admin');
+        } else {
+          next('/');
+        }
+      } else {
+        next();
+      }
+    }
+});
 
   return Router;
-}
+});

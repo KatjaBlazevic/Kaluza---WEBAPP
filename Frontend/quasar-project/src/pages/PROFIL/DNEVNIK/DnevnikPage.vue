@@ -1,12 +1,15 @@
 <template>
-  <q-page class="reminders-page"> <div class="hero-section flex flex-center">
+  <q-page class="diary-page">
+    <div class="hero-section flex flex-center">
       <div class="hero-content text-center text-white">
-        <h1 class="hero-title">Moj dnevnik</h1> <q-btn unelevated label="NOVI UNOS" color="white" text-color="dark" size="lg" class="add-reminder-btn q-mt-md" to="/dodaj-unos" /> </div>
+        <h1 class="hero-title">Moj dnevnik</h1>
+        <q-btn unelevated label="NOVI UNOS" color="white" text-color="dark" size="lg" class="add-reminder-btn q-mt-md" to="/dodaj-unos" />
+      </div>
     </div>
 
     <div class="main-content">
-      <div class="q-pa-md">
-        <q-input outlined v-model="searchQuery" placeholder="Pretraži unose po naslovu, datumu ili vremenu..." class="search-input">
+      <div class="q-pa-md row q-gutter-md items-center">
+        <q-input outlined v-model="searchQuery" placeholder="Pretraži unose po naslovu, datumu ili vremenu..." class="search-input col-grow">
           <template v-slot:append>
             <q-icon name="search" />
           </template>
@@ -14,11 +17,13 @@
       </div>
 
       <div v-if="filteredEntries.length > 0">
-        <div class="reminders-section"> <div class="row justify-center q-gutter-md">
+        <div class="entries-section"> <div class="row justify-center q-gutter-md">
             <div v-for="entry in (showAll ? filteredEntries : filteredEntries.slice(0, 3))"
                  :key="entry.SIFRA_DNEVNIKA"
-                 class="reminder-card col-xs-12 col-sm-6 col-md-4"> <q-card-section class="text-left">
-                <h3 class="reminder-title flex items-center"> <q-icon name="favorite" class="q-mr-sm text-red-6" /> <q-input v-if="entry.editMode" v-model="entry.naziv_zapisa" dense outlined />
+                 class="entry-card col-xs-12 col-sm-6 col-md-4"> <q-card-section class="text-left">
+                <h3 class="reminder-title flex items-center">
+                  <q-icon name="favorite" class="q-mr-sm text-red-6" />
+                  <q-input v-if="entry.editMode" v-model="entry.naziv_zapisa" dense outlined />
                   <span v-else>{{ entry.naziv_zapisa }}</span>
                 </h3>
 
@@ -26,15 +31,19 @@
                   {{ entry.tekst_zapisa }}
                 </p>
 
-                <p class="reminder-datetime flex items-center q-mt-sm"> <q-icon name="event" class="q-mr-sm" /> <q-input v-if="entry.editMode" v-model="entry.datum_zapisa" dense outlined type="date" />
-                  <span v-else>{{ entry.datum_zapisa }} u {{ entry.vrijeme_zapisa }}</span>
+                <p class="entry-datetime flex items-center q-mt-sm"> <q-icon name="event" class="q-mr-sm" />
+                  <q-input v-if="entry.editMode" v-model="entry.datum_zapisa_input" dense outlined type="date" />
+                  <span v-else>{{ formatCroatianDate(entry.datum_zapisa) }} u {{ entry.vrijeme_zapisa }}</span>
                 </p>
 
                 <q-input v-if="entry.editMode" v-model="entry.vrijeme_zapisa" type="time" dense outlined class="q-mt-sm" />
                 <q-input v-if="entry.editMode" v-model="entry.tekst_zapisa" dense outlined type="textarea" rows="4" class="q-mt-sm" />
 
-                <div class="reminder-actions q-mt-md flex justify-around"> <q-btn flat dense icon="edit" :label="entry.editMode ? 'Spremi' : 'Uredi'" color="primary" @click="toggleEdit(entry)" />
-                  <q-btn flat dense icon="delete" label="Obriši" color="primary" @click="deleteEntry(entry.SIFRA_DNEVNIKA)" />
+                <div class="reminder-actions q-mt-md flex justify-around">
+                  <q-btn flat dense icon="edit" :label="entry.editMode ? 'Spremi' : 'Uredi'" color="primary"
+                    @click="toggleEdit(entry)" />
+                  <q-btn flat dense icon="delete" label="Obriši" color="negative"
+                    @click="deleteEntry(entry.SIFRA_DNEVNIKA)" />
                 </div>
               </q-card-section>
             </div>
@@ -48,27 +57,53 @@
         </div>
       </div>
       <div v-else class="text-center q-pa-md">
-        <p class="text-h6 text-grey-7">Nema pronađenih unosa u dnevniku.</p> <p class="text-grey-6">Dodajte novi unos ili prilagodite pretragu.</p> </div>
+        <p class="text-h6 text-grey-7">Nema pronađenih unosa u dnevniku.</p>
+        <p class="text-grey-6">Dodajte novi unos ili prilagodite pretragu.</p>
+      </div>
     </div>
   </q-page>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
+// Uklonjen import za useQuasar jer se više ne koriste q.notify
+import { useUserStore } from '@/stores/user';
 
 const entries = ref([]);
 const showAll = ref(false);
 const searchQuery = ref('');
+const router = useRouter();
+const userStore = useUserStore();
+
+// Pomoćna funkcija za formatiranje datuma za prikaz (YYYY-MM-DD u DD.MM.YYYY.)
+// MODIFICIRANO: Uvijek dodaje točku na kraju, bez obzira na ulazni format
+const formatCroatianDate = (dateString) => {
+  if (!dateString) return '';
+
+  // Provjeri je li ulazni string već u DD.MM.YYYY formatu (bez točke na kraju)
+  // ili je u YYYY-MM-DD formatu
+  if (dateString.match(/^\d{2}\.\d{2}\.\d{4}$/)) { // Npr. 05.06.2025
+    return `${dateString}.`; // Dodaj točku ako već nije (za stare unose)
+  } else if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) { // Npr. 2025-06-05
+    const [year, month, day] = dateString.split('-');
+    return `${day}.${month}.${year}.`; // Formatiraj i dodaj točku
+  }
+  // Ako je format nepoznat, vrati originalni string (ili prazan string)
+  return dateString;
+};
 
 // 📌 Filtriranje unosa
 const filteredEntries = computed(() => {
   const query = searchQuery.value.toLowerCase();
-  return entries.value.filter(entry =>
+  let filtered = entries.value.filter(entry =>
     entry.naziv_zapisa.toLowerCase().includes(query) ||
     (entry.tekst_zapisa && entry.tekst_zapisa.toLowerCase().includes(query)) ||
-    entry.datum_zapisa.includes(query) ||
+    // Koristi formatCroatianDate za pretragu, ali makni zadnju točku radi usporedbe s DD.MM.YYYY iz queryja
+    formatCroatianDate(entry.datum_zapisa).replace(/\.$/, '').includes(query) ||
     entry.vrijeme_zapisa.includes(query)
   );
+  return filtered;
 });
 
 // 📌 Prikaži više/manje unosa
@@ -78,17 +113,30 @@ function toggleShowAll() {
 
 // 📌 Dohvaćanje unosa iz dnevnika
 async function fetchEntries() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    console.error('Niste prijavljeni. Molimo prijavite se.');
+    return;
+  }
+
   try {
     const res = await fetch('http://localhost:3000/dnevnik', {
       method: 'GET',
-      credentials: 'include'
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
 
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      console.error('Sesija istekla ili token nevažeći. Molimo prijavite se ponovno.');
+      return;
+    }
+
     if (!res.ok) {
-      if (res.status === 401) {
-        console.error('Niste prijavljeni. Molimo prijavite se.');
-        return [];
-      }
       throw new Error(`Greška pri dohvaćanju: ${res.statusText}`);
     }
 
@@ -100,7 +148,8 @@ async function fetchEntries() {
 
     entries.value = data.map(entry => ({
       ...entry,
-      editMode: false
+      editMode: false,
+      datum_zapisa_input: entry.datum_zapisa // Backend vraća YYYY-MM-DD, što je idealno za type="date"
     }));
 
   } catch (err) {
@@ -111,37 +160,53 @@ async function fetchEntries() {
 // 📌 Omogućivanje uređivanja unosa i spremanje
 async function toggleEdit(entry) {
   if (entry.editMode) {
+    // entry.datum_zapisa_input (tipa "date") je već u YYYY-MM-DD formatu, direktno ga koristimo
+    entry.datum_zapisa = entry.datum_zapisa_input;
+
     await updateEntry(entry);
     await fetchEntries();
+  } else {
+    // Kada ulazimo u edit mode, inicijaliziraj datum_zapisa_input s postojećim datumom (koji je YYYY-MM-DD)
+    entry.datum_zapisa_input = entry.datum_zapisa;
   }
   entry.editMode = !entry.editMode;
 }
 
 // 📌 Ažuriranje unosa u dnevniku
 async function updateEntry(entry) {
-
-  let datumZaBackend = entry.datum_zapisa;
-  if (datumZaBackend.includes(".")) {
-    const parts = datumZaBackend.split('.');
-    if (parts.length === 3) {
-      datumZaBackend = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-    }
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    console.error('Niste prijavljeni. Molimo prijavite se.');
+    return;
   }
 
   const requestBody = {
     naziv_zapisa: entry.naziv_zapisa,
     tekst_zapisa: entry.tekst_zapisa,
-    datum_zapisa: datumZaBackend,
-    vrijeme_zapisa: entry.vrijeme_zapisa
+    datum_zapisa: entry.datum_zapisa, // Ovo je već YYYY-MM-DD
+    vrijeme_zapisa: entry.vrijeme_zapisa // Ovo je HH:MM
   };
+
+  console.log("Frontend šalje na PUT (Dnevnik):", requestBody);
 
   try {
     const response = await fetch(`http://localhost:3000/dnevnik/${entry.SIFRA_DNEVNIKA}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(requestBody)
     });
+
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      console.error('Sesija istekla ili token nevažeći. Molimo prijavite se ponovno.');
+      return;
+    }
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -157,11 +222,28 @@ async function updateEntry(entry) {
 // 📌 Brisanje unosa u dnevniku
 async function deleteEntry(id) {
   if (confirm('Jeste li sigurni da želite obrisati ovaj unos iz dnevnika?')) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/prijava');
+      console.error('Niste prijavljeni. Molimo prijavite se.');
+      return;
+    }
+
     try {
       const response = await fetch(`http://localhost:3000/dnevnik/${id}`, {
         method: 'DELETE',
-        credentials: 'include'
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
+
+      if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem('token');
+        userStore.clearUser();
+        router.push('/prijava');
+        console.error('Sesija istekla ili token nevažeći. Molimo prijavite se ponovno.');
+        return;
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -180,7 +262,8 @@ onMounted(fetchEntries);
 </script>
 
 <style scoped>
-.reminders-page {
+/* Vaši postojeći stilovi, promijenjene klase reminder-card u entry-card i reminders-section u entries-section */
+.diary-page {
   background-color: white;
 }
 
@@ -223,7 +306,7 @@ onMounted(fetchEntries);
   border-radius: 15px;
 }
 
-.reminders-section {
+.entries-section {
   background: var(--q-secondary);
   border-radius: 15px;
   padding: 40px;
@@ -231,7 +314,7 @@ onMounted(fetchEntries);
   box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
-.reminder-card {
+.entry-card {
   background: white;
   border-radius: 15px;
   padding: 30px;
@@ -247,14 +330,13 @@ onMounted(fetchEntries);
   color: var(--q-dark);
 }
 
-.entry-text { /* ✅ Novi stil za tekst zapisa, sličan datetimeu */
+.entry-text {
   font-size: 0.95em;
-  color: #555; /* Tamnija nijansa sive za bolju čitljivost */
-  margin-bottom: 10px; /* Razmak ispod teksta zapisa */
+  color: #555;
+  margin-bottom: 10px;
 }
 
-
-.reminder-datetime {
+.entry-datetime {
   font-size: 1em;
   color: gray;
 }
@@ -273,11 +355,11 @@ onMounted(fetchEntries);
     padding: 60px 5%;
   }
 
-  .reminders-section {
+  .entries-section {
     padding: 30px;
   }
 
-  .reminder-card {
+  .entry-card {
     width: 100%;
     max-width: 350px;
     margin-bottom: 20px;
@@ -295,8 +377,12 @@ onMounted(fetchEntries);
     border-radius: 20px 20px 0 0;
   }
 
-  .reminders-section {
+  .entries-section {
     padding: 20px;
+  }
+
+  .search-input {
+    width: 100%;
   }
 }
 </style>

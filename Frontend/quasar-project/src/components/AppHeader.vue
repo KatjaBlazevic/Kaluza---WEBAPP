@@ -1,12 +1,10 @@
 <template>
   <q-header elevated class="bg-primary text-white">
     <q-toolbar class="header-toolbar">
-      <!-- Lijevo - Logo -->
       <div class="header-left">
         <span class="text-h5">Pets&Care</span>
       </div>
 
-      <!-- Sredina - Navigacija -->
       <div class="header-center gt-sm">
         <q-btn flat label="Početna" to="/" class="text-button" />
         <q-btn flat label="O nama" to="/about" class="text-button" />
@@ -15,29 +13,34 @@
         <q-btn flat label="Kontakt" to="/contact" class="text-button" />
       </div>
 
-      <!-- Desno - Profil -->
       <div class="header-right gt-sm">
         <q-btn
           flat
           label="Moj profil"
-          :to="userStore?.SIFRA_VETERINARA ? '/profile-veterinar' : '/profile'"
+          :to="userStore.role === 'veterinar' ? '/profile-veterinar' : userStore.role === 'admin' ? '/admin' : '/profile'"
+          class="text-button"
+        />
+        <q-btn
+          v-if="userStore.isAuthenticated"
+          flat
+          icon="logout"
+          label="Odjava"
+          @click="logout"
           class="text-button"
         />
       </div>
 
-      <!-- Mobilni meni ikona -->
       <q-btn
         flat
         round
         dense
         icon="menu"
-        class="lt-md"
+        class="lt-md q-ml-auto"
         @click="toggleLeftDrawer"
         aria-label="Glavni meni"
       />
     </q-toolbar>
 
-    <!-- Mobilni drawer meni -->
     <q-drawer
       v-model="leftDrawerOpen"
       side="left"
@@ -53,15 +56,37 @@
 
           <q-item
             v-for="link in links"
-            :key="link.to"
+            :key="link.to || link.label"
             clickable
             v-ripple
             :to="link.to"
+            @click="link.action ? link.action() : toggleLeftDrawer()"
+            class="text-white q-my-xs"
+            active-class="active-menu-item"
+          >
+            <q-item-section>{{ link.label }}</q-item-section>
+          </q-item>
+
+          <q-separator color="white" class="q-my-sm" />
+          <q-item
+            clickable
+            v-ripple
+            :to="userStore.role === 'veterinar' ? '/profile-veterinar' : userStore.role === 'admin' ? '/admin' : '/profile'"
             class="text-white q-my-xs"
             active-class="active-menu-item"
             @click="toggleLeftDrawer"
           >
-            <q-item-section>{{ link.label }}</q-item-section>
+            <q-item-section>Moj profil</q-item-section>
+          </q-item>
+
+          <q-item
+            v-if="userStore.isAuthenticated"
+            clickable
+            v-ripple
+            @click="logout"
+            class="text-white q-my-xs"
+          >
+            <q-item-section>Odjava</q-item-section>
           </q-item>
         </q-list>
       </q-scroll-area>
@@ -71,10 +96,35 @@
 
 <script setup>
 import { ref } from 'vue';
-import { useUserStore } from '@/stores/user'; // Ispravan import za userStore
+import { useRouter } from 'vue-router';
+import { jwtDecode } from 'jwt-decode';
+import { useUserStore } from '../stores/user';
+
+const router = useRouter();
+const userStore = useUserStore();
 
 const leftDrawerOpen = ref(false);
-const userStore = useUserStore(); // Osiguraj da je userStore dostupan
+
+const getUserRole = () => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    userStore.clearUser();
+    return null;
+  }
+
+  try {
+    const decoded = jwtDecode(token);
+    userStore.setUser({ role: decoded.role });
+    return decoded.role || null;
+  } catch (err) {
+    console.error('Greška pri dekodiranju tokena ili postavljanju role:', err);
+    userStore.clearUser();
+    return null;
+  }
+};
+
+getUserRole();
+
 
 const links = [
   { label: 'Početna', to: '/' },
@@ -82,16 +132,21 @@ const links = [
   { label: 'Događaji', to: '/events' },
   { label: 'Veterinari', to: '/vets' },
   { label: 'Kontakt', to: '/contact' },
-  { label: 'Moj profil', to: userStore?.SIFRA_VETERINARA ? '/profile-veterinar' : '/profile' }
 ];
 
 const toggleLeftDrawer = () => {
   leftDrawerOpen.value = !leftDrawerOpen.value;
 };
 
-// Debugging - provjeri podatke iz userStore
-console.log("UserStore podaci:", userStore);
+const logout = () => {
+  userStore.clearUser();
+  router.push('/prijava');
+  if (leftDrawerOpen.value) {
+    leftDrawerOpen.value = false;
+  }
+};
 </script>
+
 
 <style scoped>
 .header-toolbar {
@@ -125,7 +180,6 @@ console.log("UserStore podaci:", userStore);
   padding: 0 12px;
 }
 
-/* Mobilni meni stilovi */
 .q-drawer {
   background-color: var(--q-primary) !important;
 }
@@ -134,7 +188,6 @@ console.log("UserStore podaci:", userStore);
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Responsivne prilagodbe */
 @media (max-width: 1023px) {
   .header-toolbar {
     padding: 0 20px;
@@ -143,6 +196,14 @@ console.log("UserStore podaci:", userStore);
 
   .header-center, .header-right {
     display: none;
+  }
+
+  .lt-md {
+    order: 3;
+  }
+
+  .header-left {
+    order: 1;
   }
 }
 

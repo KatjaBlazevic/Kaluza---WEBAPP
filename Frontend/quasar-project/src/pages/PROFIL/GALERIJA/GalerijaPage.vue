@@ -1,6 +1,5 @@
 <template>
   <q-page class="gallery-page">
-    <!-- Hero sekcija -->
     <div class="hero-section flex flex-center">
       <div class="hero-content text-center text-white">
         <h1 class="hero-title">Galerija mojih ljubimaca</h1>
@@ -8,7 +7,6 @@
       </div>
     </div>
 
-    <!-- Glavni sadržaj -->
     <div class="main-content">
       <div v-if="galleryImages.length > 0">
         <div class="gallery-section">
@@ -40,17 +38,41 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useUserStore } from '@/stores/user'; // Dodano za pristup userStore-u
 
 const galleryImages = ref([]);
 const showAll = ref(false);
 const router = useRouter();
+const userStore = useUserStore(); // Inicijalizacija userStore-a
 
 async function fetchGallery() {
+  // Dohvati JWT token iz localStorage-a
+  const token = localStorage.getItem('token');
+
+  // Ako token ne postoji, preusmjeri na prijavu
+  if (!token) {
+    router.push('/prijava');
+    return;
+  }
+
   try {
     const res = await fetch('http://localhost:3000/galerija', {
       method: 'GET',
-      credentials: 'include'
+      // Pošalji token u Authorization headeru
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
+
+    // Ako odgovor nije OK (npr. 401 Unauthorized, 403 Forbidden)
+    if (res.status === 401 || res.status === 403) {
+      // Obriši nevažeći token i podatke korisnika
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      // Preusmjeri na stranicu za prijavu
+      router.push('/prijava');
+      return;
+    }
 
     if (!res.ok) {
       const data = await res.json();
@@ -60,6 +82,7 @@ async function fetchGallery() {
     galleryImages.value = await res.json();
   } catch (err) {
     console.error('Greška pri dohvaćanju slika:', err);
+    // Opcionalno: Prikazati poruku korisniku da je došlo do greške
   }
 }
 

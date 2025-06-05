@@ -38,12 +38,11 @@
   </q-page>
 </template>
 
-
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user';
-const userStore = useUserStore();
+const userStore = useUserStore(); // Pretpostavljam da imaš user store
 
 const ime = ref('')
 const prezime = ref('')
@@ -65,7 +64,7 @@ const submitRegistration = async () => {
     const res = await fetch('http://localhost:3000/registracija', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include', // Omogućava primanje sesije
+      // ⚠️ UKLONJENO: credentials: 'include' - više ne koristimo sesije
       body: JSON.stringify({
         ime: ime.value,
         prezime: prezime.value,
@@ -77,18 +76,36 @@ const submitRegistration = async () => {
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.message || 'Došlo je do greške.');
+      throw new Error(data.message || 'Došlo je do greške prilikom registracije.');
     }
 
     successMsg.value = data.message;
 
-    // Pohrani korisnika u store ako koristiš Pinia/Vuex (opcionalno)
-    userStore.setUser(data.user);
+    // ✅ POHRANA JWT TOKENA: Backend sada šalje token u 'data.token'
+    localStorage.setItem('token', data.token);
+
+    // ✅ DEKODIRANJE TOKENA: Da bi dobio user podatke (id, ime, prezime, rolu)
+    // Tvoj 'userStore' očekuje objekt s 'id', 'ime', 'prezime', 'role'
+    const decodedToken = JSON.parse(atob(data.token.split('.')[1]));
+
+    // Pohrani korisnika u store
+    userStore.setUser({
+      id: decodedToken.id,
+      ime: decodedToken.ime,
+      prezime: decodedToken.prezime,
+      role: decodedToken.role
+      // Dodaj i druge podatke iz tokena ako ih koristiš u store-u, npr. email: decodedToken.email
+    });
 
     // Automatski preusmjeri korisnika na izradu profila
+    // ✅ PROSLJEĐIVANJE EMAILA: Email i dalje proslijeđuješ kao query parametar za 2. korak
     router.push({ path: '/izrada-profila', query: { email: email.value } });
+
   } catch (err) {
     errorMsg.value = err.message;
+    // Opcionalno, obriši token ako postoji, jer registracija nije uspjela
+    localStorage.removeItem('token');
+    userStore.clearUser(); // Očisti store
   } finally {
     loading.value = false;
   }

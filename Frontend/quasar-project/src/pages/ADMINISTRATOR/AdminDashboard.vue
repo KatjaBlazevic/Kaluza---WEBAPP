@@ -31,20 +31,52 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router"; // Uvezi useRouter
+import { useUserStore } from "@/stores/user"; // Uvezi Pinia store
+
+const router = useRouter(); // Inicijaliziraj router
+const userStore = useUserStore(); // Inicijaliziraj user store
 
 const stats = ref({ korisnici: 0, veterinari: 0, dogadaji: 0 });
 
 async function fetchStats() {
+  // 1. Provjera je li korisnik autentificiran i ima li ulogu 'admin'
+  if (!userStore.isAuthenticated || userStore.getUserRole !== 'admin') {
+    console.warn("Pokušaj pristupa admin dashboardu bez administratorskih ovlasti.");
+    // Preusmjeri na stranicu za prijavu ako nije admin
+    router.push('/prijava');
+    return; // Prekini izvršavanje funkcije
+  }
+
+  const token = userStore.token; // Dohvati token iz Pinia store-a
+
   try {
-    const res = await fetch("http://localhost:3000/admin/stats", { method: "GET", credentials: "include" });
+    const res = await fetch("http://localhost:3000/admin/stats", {
+      method: "GET",
+      // Uklanjamo credentials: "include" i dodajemo Authorization header
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` // Šaljemo JWT token
+      }
+    });
+
+    // 2. Rukovanje statusima odgovora s backenda
+    if (res.status === 403 || res.status === 401) {
+      console.error('Frontend: Pristup odbijen. Sesija istekla ili nema dozvolu.');
+      userStore.clearUser(); // Izbriši podatke o korisniku
+      router.push('/prijava'); // Preusmjeri na prijavu
+      return;
+    }
 
     if (!res.ok) {
-      throw new Error("❌ Greška pri dohvaćanju statistike.");
+      const errorData = await res.json(); // Pokušaj dohvatiti detalje greške s backenda
+      throw new Error(errorData.poruka || "❌ Greška pri dohvaćanju statistike.");
     }
 
     stats.value = await res.json();
+    console.log("Dohvaćena statistika:", stats.value);
   } catch (err) {
-    console.error("❌ Greška pri dohvaćanju statistike:", err);
+    console.error("❌ Greška pri dohvaćanju statistike:", err.message);
   }
 }
 
@@ -90,4 +122,3 @@ h1 {
   color: var(--q-accent);
 }
 </style>
-

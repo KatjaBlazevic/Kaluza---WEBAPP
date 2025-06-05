@@ -35,8 +35,8 @@
 
                 <p class="reminder-datetime flex items-center q-mt-sm">
                   <q-icon name="event" class="q-mr-sm" />
-                  <q-input v-if="reminder.editMode" v-model="reminder.datum_podsjetnika" dense outlined type="date" />
-                  <span v-else>{{ reminder.datum_podsjetnika }} u {{ reminder.vrijeme_podsjetnika }}</span>
+                  <q-input v-if="reminder.editMode" v-model="reminder.datum_podsjetnika_input" dense outlined type="date" />
+                  <span v-else>{{ formatCroatianDate(reminder.datum_podsjetnika) }} u {{ reminder.vrijeme_podsjetnika }}</span>
                 </p>
 
                 <p class="reminder-type text-bold q-mt-xs">
@@ -78,17 +78,28 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useUserStore } from '@/stores/user';
 
 const reminders = ref([]);
 const showAll = ref(false);
 const searchQuery = ref('');
+const router = useRouter();
+const userStore = useUserStore();
+
+// Funkcija za formatiranje datuma u DD.MM.YYYY.
+const formatCroatianDate = (dateString) => {
+  if (!dateString) return '';
+  const [year, month, day] = dateString.split('-');
+  return `${day}.${month}.${year}.`;
+};
 
 // Filtriranje podsjetnika
 const filteredReminders = computed(() => {
   const query = searchQuery.value.toLowerCase();
   return reminders.value.filter(reminder =>
     reminder.naziv_podsjetnika.toLowerCase().includes(query) ||
-    reminder.datum_podsjetnika.includes(query) ||
+    formatCroatianDate(reminder.datum_podsjetnika).includes(query) || // Pretraga po formatiranom datumu
     reminder.vrijeme_podsjetnika.includes(query) ||
     reminder.tip_podsjetnika.toLowerCase().includes(query)
   );
@@ -101,17 +112,28 @@ function toggleShowAll() {
 
 // Dohvaćanje podsjetnika
 async function fetchReminders() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    return;
+  }
+
   try {
     const res = await fetch('http://localhost:3000/podsjetnici', {
       method: 'GET',
-      credentials: 'include'
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
 
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      return [];
+    }
+
     if (!res.ok) {
-      if (res.status === 401) {
-        console.error('Niste prijavljeni. Molimo prijavite se.');
-        return [];
-      }
       throw new Error(`Greška pri dohvaćanju: ${res.statusText}`);
     }
 
@@ -123,7 +145,9 @@ async function fetchReminders() {
 
     reminders.value = data.map(reminder => ({
       ...reminder,
-      editMode: false
+      editMode: false,
+      // Dodajemo pomoćno polje za input type="date" koje očekuje YYYY-MM-DD
+      datum_podsjetnika_input: reminder.datum_podsjetnika
     }));
 
   } catch (err) {
@@ -134,26 +158,35 @@ async function fetchReminders() {
 // Omogućivanje uređivanja podsjetnika i spremanje
 async function toggleEdit(reminder) {
   if (reminder.editMode) {
+    // Prije slanja na backend, osiguraj da je datum u YYYY-MM-DD formatu
+    // q-input type="date" već daje YYYY-MM-DD pa samo koristimo tu vrijednost
+    reminder.datum_podsjetnika = reminder.datum_podsjetnika_input;
     console.log("➡️ Tip podsjetnika prije slanja PUT-a:", reminder.tip_podsjetnika);
     await updateReminder(reminder);
     await fetchReminders();
+  } else {
+    // Kada ulazimo u edit mode, sinkroniziraj datum za input polje
+    reminder.datum_podsjetnika_input = reminder.datum_podsjetnika;
   }
   reminder.editMode = !reminder.editMode;
 }
 
 // Ažuriranje podsjetnika
 async function updateReminder(reminder) {
-  let datumZaBackend = reminder.datum_podsjetnika;
-  if (datumZaBackend.includes(".")) {
-    const parts = datumZaBackend.split('.');
-    if (parts.length === 3) {
-      datumZaBackend = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-    }
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    return;
   }
+
+  // Datum je već u YYYY-MM-DD formatu iz q-input type="date" (datum_podsjetnika_input)
+  // ili izravno iz baze ako nismo mijenjali
+  const datumZaBackend = reminder.datum_podsjetnika_input || reminder.datum_podsjetnika;
+
   const requestBody = {
     naziv_podsjetnika: reminder.naziv_podsjetnika,
     opis_podsjetnika: reminder.opis_podsjetnika,
-    datum_podsjetnika: datumZaBackend,
+    datum_podsjetnika: datumZaBackend, // Slanje u YYYY-MM-DD formatu
     vrijeme_podsjetnika: reminder.vrijeme_podsjetnika,
     tip_podsjetnika: reminder.tip_podsjetnika
   };
@@ -161,10 +194,19 @@ async function updateReminder(reminder) {
   try {
     const response = await fetch(`http://localhost:3000/podsjetnici/${reminder.SIFRA_PODSJETNIKA}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(requestBody)
     });
+
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      return;
+    }
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -180,11 +222,26 @@ async function updateReminder(reminder) {
 // Brisanje podsjetnika
 async function deleteReminder(id) {
   if (confirm('Jeste li sigurni da želite obrisati ovaj podsjetnik?')) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/prijava');
+      return;
+    }
+
     try {
       const response = await fetch(`http://localhost:3000/podsjetnici/${id}`, {
         method: 'DELETE',
-        credentials: 'include'
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
+
+      if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem('token');
+        userStore.clearUser();
+        router.push('/prijava');
+        return;
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -202,16 +259,15 @@ async function deleteReminder(id) {
 onMounted(fetchReminders);
 </script>
 
-
-
 <style scoped>
+/* Vaši postojeći stilovi ostaju nepromijenjeni */
 .reminders-page {
   background-color: white;
 }
 
 .hero-section {
   height: 70vh;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)), url('hero_pocetna.avif'); /* Razmislite o promjeni pozadinske slike u nešto prikladnije za podsjetnike */
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)), url('hero_pocetna.avif');
   background-size: cover;
   background-position: center;
   color: white;
@@ -249,7 +305,7 @@ onMounted(fetchReminders);
 }
 
 .reminders-section {
-  background: var(--q-secondary); /* Koristite sekundarnu boju vaše teme */
+  background: var(--q-secondary);
   border-radius: 15px;
   padding: 40px;
   margin-bottom: 40px;
@@ -260,8 +316,8 @@ onMounted(fetchReminders);
   background: white;
   border-radius: 15px;
   padding: 30px;
-  width: 350px; /* Malo šira kako bi se smjestio sadržaj i akcije */
-  text-align: left; /* Poravnajte tekst lijevo radi bolje čitljivosti */
+  width: 350px;
+  text-align: left;
   box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
@@ -278,10 +334,9 @@ onMounted(fetchReminders);
 }
 
 .reminder-actions .q-btn {
-  min-width: unset; /* Poništi zadanu minimalnu širinu gumba */
+  min-width: unset;
 }
 
-/* Responsivni stilovi */
 @media (max-width: 1023px) {
   .hero-title {
     font-size: 2rem;

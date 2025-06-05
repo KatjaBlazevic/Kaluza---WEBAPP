@@ -1,270 +1,479 @@
 <template>
-  <q-page class="dokumenti-page">
+  <q-page class="documents-page">
     <div class="hero-section flex flex-center">
       <div class="hero-content text-center text-white">
-        <h1 class="hero-title">Dokumenti mojih ljubimaca</h1>
-        <q-btn unelevated label="DODAJ DOKUMENT" color="white" text-color="dark" size="lg" class="add-document-btn q-mt-md" @click="showAddDialog = true"/>
+        <h1 class="hero-title">Moji Dokumenti</h1>
+        <q-btn unelevated label="DODAJ DOKUMENT" color="white" text-color="dark" size="lg" class="add-document-btn q-mt-md" @click="openAddDialog" />
       </div>
     </div>
 
     <div class="main-content">
-      <div v-if="dokumenti.length > 0">
-        <div class="dokumenti-section">
-          <div class="row justify-center q-gutter-xl">
-            <div v-for="dok in (showAll ? dokumenti : dokumenti.slice(0, 3))"
-                 :key="dok.SIFRA_DOKUMENTA"
-                 class="dokument-card">
-              <q-card-section class="text-center">
-                <h3 class="dokument-title">Dokument za: {{ dok.ime_ljubimca }}</h3>
+      <div class="q-pa-md row q-gutter-md items-center">
+        <q-input outlined v-model="searchQuery" placeholder="Pretraži dokumente po imenu ljubimca, cjepivima ili lijekovima..." class="search-input col-grow">
+          <template v-slot:append>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+      </div>
 
-                <p class="dokument-details text-grey-8">
-                  <q-icon name="badge" class="q-mr-xs" />
-                  Putovnica:
-                  <span v-if="dok.putovnica_ljubimca">
-                    <a :href="dok.putovnica_ljubimca" target="_blank">Otvori PDF</a>
-                  </span>
-                  <span v-else>Nije uneseno</span>
+      <div v-if="filteredDocuments.length > 0">
+        <div class="documents-section">
+          <div class="row justify-center q-gutter-md">
+            <div v-for="document in (showAll ? filteredDocuments : filteredDocuments.slice(0, 3))"
+                 :key="document.SIFRA_DOKUMENTA"
+                 class="document-card col-xs-12 col-sm-6 col-md-4">
+              <q-card-section class="text-left">
+                <h3 class="document-title flex items-center">
+                  <q-icon name="description" class="q-mr-sm text-primary" />
+                  <span v-if="!document.editMode">{{ document.ime_ljubimca }}</span>
+                  <q-select
+                    v-else
+                    v-model="document.SIFRA_LJUBIMCA"
+                    :options="petOptions"
+                    option-value="SIFRA_LJUBIMCA"
+                    option-label="ime_ljubimca"
+                    label="Ljubimac"
+                    emit-value
+                    map-options
+                    dense
+                    outlined
+                  />
+                </h3>
+
+                <p class="document-details q-mt-sm">
+                  <strong>Cjepiva:</strong>
+                  <span v-if="!document.editMode">{{ document.cijepiva_ljubimca || 'Nije uneseno' }}</span>
+                  <q-input v-else v-model="document.cijepiva_ljubimca" dense outlined type="textarea" rows="2" class="q-mt-sm" />
+                </p>
+                <p class="document-details">
+                  <strong>Lijekovi:</strong>
+                  <span v-if="!document.editMode">{{ document.lijekovi_ljubimca || 'Nije uneseno' }}</span>
+                  <q-input v-else v-model="document.lijekovi_ljubimca" dense outlined type="textarea" rows="2" class="q-mt-sm" />
                 </p>
 
-                <p class="dokument-details text-grey-8">
-                  <q-icon name="family_restroom" class="q-mr-xs" />
-                  Rodovnica:
-                  <span v-if="dok.rodovnica_ljubimca">
-                    <a :href="dok.rodovnica_ljubimca" target="_blank">Otvori PDF</a>
-                  </span>
-                  <span v-else>Nije uneseno</span>
-                </p>
+                <div class="document-files q-mt-md">
+                  <p v-if="document.putovnica_ljubimca">
+                    <q-btn flat dense icon="picture_as_pdf" label="Putovnica" color="accent" @click="viewFile(document.putovnica_ljubimca, 'Putovnica.pdf')" />
+                  </p>
+                  <p v-if="document.rodovnica_ljubimca">
+                    <q-btn flat dense icon="picture_as_pdf" label="Rodovnica" color="accent" @click="viewFile(document.rodovnica_ljubimca, 'Rodovnica.pdf')" />
+                  </p>
 
-                <p class="dokument-details q-mt-xs text-grey-8">
-                  <q-icon name="assignment" class="q-mr-xs" /> Cijepiva: {{ dok.cijepiva_ljubimca }}
-                </p>
-                <p class="dokument-details text-grey-8">
-                  <q-icon name="medication" class="q-mr-xs" /> Lijekovi: {{ dok.lijekovi_ljubimca }}
-                </p>
+                  <div v-if="document.editMode" class="q-mt-md">
+                    <q-file v-model="document.new_putovnica" label="Nova putovnica (PDF, JPG, PNG)" accept=".pdf, .jpg, .jpeg, .png" outlined dense clearable>
+                      <template v-slot:prepend>
+                        <q-icon name="cloud_upload" />
+                      </template>
+                    </q-file>
+                    <q-file v-model="document.new_rodovnica" label="Nova rodovnica (PDF, JPG, PNG)" accept=".pdf, .jpg, .jpeg, .png" outlined dense clearable class="q-mt-sm">
+                      <template v-slot:prepend>
+                        <q-icon name="cloud_upload" />
+                      </template>
+                    </q-file>
+                  </div>
+                </div>
 
-                <div class="dokument-actions q-mt-md flex justify-around">
-                  <q-btn flat dense icon="edit" label="Uredi" color="primary" @click="openEditDialog(dok)" />
-                  <q-btn flat dense icon="delete" label="Obriši" color="negative" @click="deleteDokument(dok.SIFRA_DOKUMENTA)" />
+                <div class="document-actions q-mt-md flex justify-around">
+                  <q-btn flat dense icon="edit" :label="document.editMode ? 'Spremi' : 'Uredi'" color="primary"
+                    @click="toggleEdit(document)" />
+                  <q-btn flat dense icon="delete" label="Obriši" color="negative"
+                    @click="deleteDocument(document.SIFRA_DOKUMENTA)" />
                 </div>
               </q-card-section>
             </div>
           </div>
         </div>
 
-        <div class="text-center q-mt-md">
-          <q-btn v-if="dokumenti.length > 3" @click="showAll = !showAll" :label="showAll ? 'Prikaži manje' : 'Prikaži više'" color="primary" />
+        <div class="q-mt-lg text-center">
+          <q-btn v-if="filteredDocuments.length > 3" @click="toggleShowAll" flat color="primary">
+            {{ showAll ? 'Prikaži manje' : 'Prikaži više' }}
+          </q-btn>
         </div>
       </div>
-      <div v-else class="text-center q-mt-xl">
-        <p class="text-h6 text-dark">Nema dostupnih dokumenata.</p>
+      <div v-else class="text-center q-pa-md">
+        <p class="text-h6 text-grey-7">Nema pronađenih dokumenata.</p>
+        <p class="text-grey-6">Dodajte novi dokument ili prilagodite pretragu.</p>
       </div>
     </div>
 
-    <!-- Dijalog za dodavanje dokumenta -->
     <q-dialog v-model="showAddDialog">
-      <q-card style="width: 500px;">
+      <q-card style="min-width: 350px">
         <q-card-section>
-          <h2>Dodaj novi dokument</h2>
+          <div class="text-h6">Dodaj Novi Dokument</div>
         </q-card-section>
-        <q-card-section>
-          <q-select v-model="noviDokument.SIFRA_LJUBIMCA"
-          :options="ljubimciOptions"
-          label="Odaberi ljubimca"
-          emit-value
-          map-options
-          @update:model-value="updateLjubimacSelection" />
-          <q-input v-model="noviDokument.cijepiva_ljubimca" label="Cijepiva" outlined />
-          <q-input v-model="noviDokument.lijekovi_ljubimca" label="Lijekovi" outlined />
-          <q-file label="Putovnica (PDF)" filled @change="handleFileUpload($event, 'putovnica_ljubimca')" />
-          <q-file label="Rodovnica (PDF)" filled @change="handleFileUpload($event, 'rodovnica_ljubimca')" />
+
+        <q-card-section class="q-pt-none">
+          <q-select
+            v-model="newDocument.SIFRA_LJUBIMCA"
+            :options="petOptions"
+            option-value="SIFRA_LJUBIMCA"
+            option-label="ime_ljubimca"
+            label="Odaberite ljubimca"
+            emit-value
+            map-options
+            outlined
+            dense
+            class="q-mb-md"
+          />
+          <q-input v-model="newDocument.cijepiva_ljubimca" label="Cjepiva (opis)" type="textarea" rows="2" outlined dense class="q-mb-md" />
+          <q-input v-model="newDocument.lijekovi_ljubimca" label="Lijekovi (opis)" type="textarea" rows="2" outlined dense class="q-mb-md" />
+          <q-file v-model="newDocument.putovnica_ljubimca" label="Učitaj Putovnicu (PDF, JPG, PNG)" accept=".pdf, .jpg, .jpeg, .png" outlined dense class="q-mb-md">
+            <template v-slot:prepend>
+              <q-icon name="cloud_upload" />
+            </template>
+          </q-file>
+          <q-file v-model="newDocument.rodovnica_ljubimca" label="Učitaj Rodovnicu (PDF, JPG, PNG)" accept=".pdf, .jpg, .jpeg, .png" outlined dense>
+            <template v-slot:prepend>
+              <q-icon name="cloud_upload" />
+            </template>
+          </q-file>
         </q-card-section>
+
         <q-card-actions align="right">
-          <q-btn label="Odustani" flat @click="showAddDialog = false" />
-          <q-btn label="Spremi" color="primary" @click="submitDokument" />
+          <q-btn flat label="Odustani" color="negative" v-close-popup />
+          <q-btn flat label="Dodaj" color="primary" @click="addDocument" :disable="!newDocument.SIFRA_LJUBIMCA" />
         </q-card-actions>
       </q-card>
     </q-dialog>
 
-    <!-- Dijalog za uređivanje dokumenta -->
-    <q-dialog v-model="showEditDialog">
-      <q-card style="width: 500px;">
-        <q-card-section>
-          <h2>Uredi dokument</h2>
-        </q-card-section>
-        <q-card-section>
-          <q-input v-model="editDokumentData.cijepiva_ljubimca" label="Cijepiva" outlined />
-          <q-input v-model="editDokumentData.lijekovi_ljubimca" label="Lijekovi" outlined />
-        </q-card-section>
-        <q-card-actions align="right">
-          <q-btn label="Odustani" flat @click="showEditDialog = false" />
-          <q-btn label="Spremi" color="primary" @click="saveEditDokument" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
+// Uklonjen import za useQuasar
+import { useUserStore } from '@/stores/user';
 
-const ljubimciOptions = ref([]);
-const dokumenti = ref([]);
+const documents = ref([]);
+const petOptions = ref([]);
 const showAll = ref(false);
+const searchQuery = ref('');
+const router = useRouter();
+const userStore = useUserStore();
 const showAddDialog = ref(false);
-const showEditDialog = ref(false);
-const editDokumentData = ref(null);
-
-const noviDokument = ref({
+const newDocument = ref({
+  SIFRA_LJUBIMCA: null,
   cijepiva_ljubimca: '',
   lijekovi_ljubimca: '',
-  putovnica_ljubimca: '',
-  rodovnica_ljubimca: ''
+  putovnica_ljubimca: null,
+  rodovnica_ljubimca: null,
 });
 
-// 📌 Dohvati ljubimce prijavljenog korisnika
-async function fetchLjubimci() {
+// 📌 Filtriranje dokumenata
+const filteredDocuments = computed(() => {
+  const query = searchQuery.value.toLowerCase();
+  return documents.value.filter(doc =>
+    (doc.ime_ljubimca && doc.ime_ljubimca.toLowerCase().includes(query)) ||
+    (doc.cijepiva_ljubimca && doc.cijepiva_ljubimca.toLowerCase().includes(query)) ||
+    (doc.lijekovi_ljubimca && doc.lijekovi_ljubimca.toLowerCase().includes(query))
+  );
+});
+
+// 📌 Prikaži više/manje dokumenata
+function toggleShowAll() {
+  showAll.value = !showAll.value;
+}
+
+// 📌 Prikaz datoteke (Base64 u PDF/sliku)
+function viewFile(base64String, filename) {
+  if (!base64String) {
+    console.warn('Datoteka nije dostupna za pregled.');
+    return;
+  }
+
+  // Odredite MIME tip na temelju prvih znakova Base64 stringa
+  let mimeType;
+  if (base64String.startsWith('/9j/') || base64String.startsWith('iVBORw0KGgo')) {
+    mimeType = 'image/jpeg'; // ili image/png
+  } else if (base64String.startsWith('JVBERi0x')) {
+    mimeType = 'application/pdf';
+  } else {
+    // Pokušaj pogoditi na temelju ekstenzije, ako filename postoji
+    const ext = filename.split('.').pop().toLowerCase();
+    if (ext === 'pdf') mimeType = 'application/pdf';
+    else if (['jpg', 'jpeg'].includes(ext)) mimeType = 'image/jpeg';
+    else if (ext === 'png') mimeType = 'image/png';
+    else mimeType = 'application/octet-stream'; // Default ako ne prepoznamo
+  }
+
+  const byteCharacters = atob(base64String);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  const blob = new Blob([byteArray], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+
+  window.open(url, '_blank');
+}
+
+
+// 📌 Dohvaćanje dokumenata
+async function fetchDocuments() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    console.error('Niste prijavljeni. Molimo prijavite se.');
+    return;
+  }
+
   try {
-    const res = await fetch('http://localhost:3000/moji-ljubimci', {
+    const res = await fetch('http://localhost:3000/dokument', {
       method: 'GET',
-      credentials: 'include'
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
 
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      console.error('Sesija istekla ili token nevažeći. Molimo prijavite se ponovno.');
+      return;
+    }
+
     if (!res.ok) {
-      throw new Error('❌ Greška pri dohvaćanju ljubimaca.');
+      throw new Error(`Greška pri dohvaćanju: ${res.statusText}`);
     }
 
     const data = await res.json();
 
-    // ✅ Ispravno formatiranje za Vue `q-select`
-    ljubimciOptions.value = data.map(lj => ({
-      label: lj.ime_ljubimca,   // 👈 Koristi pravo ime ljubimca
-      value: lj.SIFRA_LJUBIMCA  // 👈 Koristi šifru ljubimca za backend
+    if (!Array.isArray(data)) {
+      throw new Error("API nije vratio niz dokumenata!");
+    }
+
+    documents.value = data.map(doc => ({
+      ...doc,
+      editMode: false,
+      new_putovnica: null,
+      new_rodovnica: null,
     }));
 
   } catch (err) {
-    console.error('❌ Greška pri dohvaćanju ljubimaca:', err);
+    console.error("Greška pri dohvaćanju dokumenata:", err);
   }
 }
 
+// 📌 Dohvaćanje ljubimaca za dropdown
+async function fetchPets() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    console.error('Niste prijavljeni. Ne mogu dohvatiti ljubimce.');
+    return;
+  }
 
-// 📌 Dohvat dokumenata—sada sigurno definiran prije poziva
-async function fetchDokumenti() {
   try {
-    const res = await fetch('http://localhost:3000/dokument', {
+    const res = await fetch('http://localhost:3000/moji-ljubimci', {
       method: 'GET',
-      credentials: 'include'
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
 
     if (!res.ok) {
-      throw new Error('❌ Greška pri dohvaćanju dokumenata.');
+      throw new Error(`Greška pri dohvaćanju ljubimaca: ${res.statusText}`);
     }
 
-    dokumenti.value = await res.json();
+    const data = await res.json();
+    petOptions.value = data;
   } catch (err) {
-    console.error('❌ Greška pri dohvaćanju dokumenata:', err);
+    console.error("Greška pri dohvaćanju ljubimaca za odabir:", err);
   }
 }
 
-// 📌 Funkcija za otvaranje prozora za uređivanje
-function openEditDialog(dok) {
-  editDokumentData.value = { ...dok };
-  showEditDialog.value = true;
+// 📌 Otvaranje/zatvaranje dijaloga za dodavanje
+function openAddDialog() {
+  newDocument.value = {
+    SIFRA_LJUBIMCA: null,
+    cijepiva_ljubimca: '',
+    lijekovi_ljubimca: '',
+    putovnica_ljubimca: null,
+    rodovnica_ljubimca: null,
+  };
+  showAddDialog.value = true;
 }
 
-// 📌 Funkcija za spremanje uređivanja
-async function saveEditDokument() {
-  const requestData = {
-    cijepiva_ljubimca: editDokumentData.value.cijepiva_ljubimca || "",
-    lijekovi_ljubimca: editDokumentData.value.lijekovi_ljubimca || "",
-    putovnica_ljubimca: editDokumentData.value.putovnica_ljubimca || null, // ✅ Sprema `null` ako je prazno
-    rodovnica_ljubimca: editDokumentData.value.rodovnica_ljubimca || null  // ✅ Sprema `null` ako je prazno
-  };
+// 📌 Omogućivanje uređivanja dokumenta i spremanje
+async function toggleEdit(document) {
+  if (document.editMode) {
+    await updateDocument(document);
+    await fetchDocuments(); // Osvježi podatke nakon ažuriranja
+  } else {
+    // Kada ulazimo u edit mode, provjeri je li ime ljubimca u dropdownu
+    // i postavi ga ako nije (prvi put ulazimo u edit mode)
+    if (document.SIFRA_LJUBIMCA && !petOptions.value.find(p => p.SIFRA_LJUBIMCA === document.SIFRA_LJUBIMCA)) {
+       // Ako ljubimac nije u opcijama (npr. obrisan je), pokušaj dohvatiti ponovno ili resetirati
+       await fetchPets(); // Pokušaj dohvatiti ponovno za svaki slučaj
+    }
+  }
+  document.editMode = !document.editMode;
+}
+
+// 📌 Ažuriranje dokumenta
+async function updateDocument(document) {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    console.error('Niste prijavljeni. Molimo prijavite se.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('cijepiva_ljubimca', document.cijepiva_ljubimca || '');
+  formData.append('lijekovi_ljubimca', document.lijekovi_ljubimca || '');
+
+  if (document.new_putovnica) {
+    formData.append('putovnica_ljubimca', document.new_putovnica);
+  }
+  if (document.new_rodovnica) {
+    formData.append('rodovnica_ljubimca', document.new_rodovnica);
+  }
+
+  console.log("Frontend šalje na PUT (Dokument):", formData);
 
   try {
-    const response = await fetch(`http://localhost:3000/dokument/${editDokumentData.value.SIFRA_DOKUMENTA}`, {
+    const response = await fetch(`http://localhost:3000/dokument/${document.SIFRA_DOKUMENTA}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(requestData)
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
     });
 
-    if (!response.ok) {
-      throw new Error("❌ Greška pri ažuriranju dokumenta.");
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      console.error('Sesija istekla ili token nevažeći. Molimo prijavite se ponovno.');
+      return;
     }
 
-    console.log("✅ Dokument uspješno ažuriran!");
-    showEditDialog.value = false;
-    await fetchDokumenti();
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Greška servera: ${errorData.poruka || response.statusText}`);
+    }
+
+    console.log("Dokument uspješno ažuriran!");
+    document.new_putovnica = null; // Resetiraj odabrane datoteke nakon uspješnog slanja
+    document.new_rodovnica = null;
   } catch (err) {
-    console.error("❌ Greška pri ažuriranju dokumenta:", err);
+    console.error("Greška pri ažuriranju dokumenta:", err);
   }
 }
 
+// 📌 Dodavanje dokumenta
+async function addDocument() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    console.error('Niste prijavljeni. Molimo prijavite se.');
+    return;
+  }
 
-async function submitDokument() {
+  const formData = new FormData();
+  formData.append('SIFRA_LJUBIMCA', newDocument.value.SIFRA_LJUBIMCA);
+  formData.append('cijepiva_ljubimca', newDocument.value.cijepiva_ljubimca || '');
+  formData.append('lijekovi_ljubimca', newDocument.value.lijekovi_ljubimca || '');
+
+  if (newDocument.value.putovnica_ljubimca) {
+    formData.append('putovnica_ljubimca', newDocument.value.putovnica_ljubimca);
+  }
+  if (newDocument.value.rodovnica_ljubimca) {
+    formData.append('rodovnica_ljubimca', newDocument.value.rodovnica_ljubimca);
+  }
+
+  console.log("Frontend šalje na POST (Dokument):", newDocument.value);
 
   try {
     const response = await fetch('http://localhost:3000/dokument', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(noviDokument.value)
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
     });
 
-    if (!response.ok) {
-      throw new Error("❌ Greška servera pri dodavanju dokumenta.");
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      console.error('Sesija istekla ili token nevažeći. Molimo prijavite se ponovno.');
+      return;
     }
 
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Greška servera: ${errorData.poruka || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log(result.poruka); // Ispis poruke u konzolu
     showAddDialog.value = false;
-    await fetchDokumenti();
+    await fetchDocuments(); // Osvježi listu dokumenata
   } catch (err) {
-    console.error("❌ Greška pri dodavanju dokumenta:", err);
+    console.error("Greška pri dodavanju dokumenta:", err);
   }
 }
 
 // 📌 Brisanje dokumenta
-async function deleteDokument(id) {
-  if (!confirm("Jeste li sigurni da želite obrisati dokument?")) return;
+async function deleteDocument(id) {
+  if (!confirm('Jeste li sigurni da želite obrisati ovaj dokument?')) {
+    return; // Korisnik je odustao
+  }
+
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    console.error('Niste prijavljeni. Molimo prijavite se.');
+    return;
+  }
 
   try {
     const response = await fetch(`http://localhost:3000/dokument/${id}`, {
-      method: "DELETE",
-      credentials: "include"
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
+
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      console.error('Sesija istekla ili token nevažeći. Molimo prijavite se ponovno.');
+      return;
+    }
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(`❌ Greška servera pri brisanju dokumenta: ${errorData.poruka || response.statusText}`);
+      throw new Error(`Greška servera: ${errorData.poruka || response.statusText}`);
     }
 
-    console.log("✅ Dokument uspješno obrisan!");
-    await fetchDokumenti(); // Osveži prikaz dokumenata
+    console.log('Dokument uspješno obrisan!');
+    await fetchDocuments();
   } catch (err) {
-    console.error("❌ Greška pri brisanju dokumenta:", err);
+    console.error('Greška pri brisanju dokumenta:', err);
   }
 }
 
-function updateLjubimacSelection(value) {
-  noviDokument.value.SIFRA_LJUBIMCA = value;
-  console.log("📌 Postavljen ljubimac:", noviDokument.value.SIFRA_LJUBIMCA);
-}
-
 onMounted(() => {
-  fetchDokumenti();
-  fetchLjubimci();
+  fetchDocuments();
+  fetchPets();
 });
-
 </script>
 
-
 <style scoped>
-.dokumenti-page {
+/* Vaši postojeći stilovi, promijenjene klase reminders-section u documents-section i reminder-card u document-card */
+.documents-page {
   background-color: white;
 }
 
 .hero-section {
   height: 70vh;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)), url('hero_pocetna.avif');
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)), url('hero_pocetna.avif'); /* Provjerite putanju slike */
   background-size: cover;
   background-position: center;
   color: white;
@@ -296,33 +505,43 @@ onMounted(() => {
   background-color: white;
 }
 
-.dokumenti-section {
-  background: var(--q-secondary);
+.search-input {
+  margin-bottom: 30px;
+  border-radius: 15px;
+}
+
+.documents-section {
+  background: var(--q-secondary); /* Provjerite je li --q-secondary definiran u vašem Quasar temu */
   border-radius: 15px;
   padding: 40px;
   margin-bottom: 40px;
   box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
-.dokument-card {
+.document-card {
   background: white;
   border-radius: 15px;
   padding: 30px;
-  width: 300px;
-  text-align: center;
+  width: 350px;
+  text-align: left;
   box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
-.dokument-title {
-  font-size: 1.2rem;
+.document-title {
+  font-size: 1.3rem;
   font-weight: bold;
   line-height: 1.7;
-  color: var(--q-dark);
+  color: var(--q-dark); /* Provjerite je li --q-dark definiran */
 }
 
-.dokument-details {
-  font-size: 0.95rem;
-  color: var(--q-dark);
+.document-details {
+  font-size: 0.95em;
+  color: #555;
+  margin-bottom: 5px;
+}
+
+.document-actions .q-btn {
+  min-width: unset;
 }
 
 /* Responsivni stilovi */
@@ -335,11 +554,11 @@ onMounted(() => {
     padding: 60px 5%;
   }
 
-  .dokumenti-section {
+  .documents-section {
     padding: 30px;
   }
 
-  .dokument-card {
+  .document-card {
     width: 100%;
     max-width: 350px;
     margin-bottom: 20px;
@@ -357,8 +576,12 @@ onMounted(() => {
     border-radius: 20px 20px 0 0;
   }
 
-  .dokumenti-section {
+  .documents-section {
     padding: 20px;
+  }
+
+  .search-input {
+    width: 100%;
   }
 }
 </style>

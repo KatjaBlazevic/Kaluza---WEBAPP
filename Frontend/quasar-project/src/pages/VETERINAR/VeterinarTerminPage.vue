@@ -70,14 +70,13 @@
   </q-page>
 </template>
 
-
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { useQuasar } from 'quasar';
+// import { useQuasar } from 'quasar'; // Uklonjeno
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 
-const $q = useQuasar();
+// const $q = useQuasar(); // Uklonjeno
 const router = useRouter();
 const userStore = useUserStore();
 
@@ -113,14 +112,35 @@ const filteredTermini = computed(() => {
 
 // Dohvat termina za veterinara
 async function fetchTerminiZaVeterinara() {
+  // Provjera autentifikacije i uloge
+  if (!userStore.isAuthenticated || userStore.getUserRole !== 'veterinar') {
+    // $q.notify je uklonjen odavde
+    router.push('/prijava'); // Preusmjeri na stranicu za prijavu
+    return;
+  }
+
+  const token = userStore.token; // Dohvati token iz store-a
+
   try {
-    const response = await fetch("http://localhost:3000/termin", {
+    // API ruta je sada /veterinar/termini i zahtijeva Authorization header
+    const response = await fetch("http://localhost:3000/veterinar/termini", {
       method: "GET",
-      credentials: "include",
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` // Slanje tokena u headeru
+      }
     });
 
+    if (response.status === 403 || response.status === 401) {
+        // $q.notify je uklonjen odavde
+        userStore.clearUser();
+        router.push('/prijava');
+        return;
+    }
+
     if (!response.ok) {
-      console.error("Greška pri dohvaćanju termina");
+      console.error("Greška pri dohvaćanju termina:", response.status, response.statusText);
+      // $q.notify je uklonjen odavde
       return;
     }
 
@@ -131,36 +151,58 @@ async function fetchTerminiZaVeterinara() {
 
   } catch (err) {
     console.error("Greška pri dohvaćanju termina:", err);
+    // $q.notify je uklonjen odavde
   }
-  console.log("UserStore podaci:", JSON.stringify(userStore.$state, null, 2));
 }
 
 // Ažuriranje statusa termina
 async function updateTerminStatus(terminId, newStatus) {
+  // Ponovna provjera autentifikacije i uloge prije slanja PUT zahtjeva
+  if (!userStore.isAuthenticated || userStore.getUserRole !== 'veterinar') {
+    // $q.notify je uklonjen odavde
+    router.push('/prijava');
+    return;
+  }
+
+  const token = userStore.token; // Dohvati token iz store-a
+  const SIFRA_VETERINARA_JWT = userStore.getUserId; // ID veterinara iz store-a
+
   try {
     const payload = {
       status_termina: newStatus,
-      SIFRA_VETERINARA: userStore.SIFRA_VETERINARA
     };
 
-    console.log("Šaljem zahtjev za ažuriranje:", payload); // Debugging
+    console.log("Šaljem zahtjev za ažuriranje termina:", terminId, "s payloadom:", payload); // Debugging
 
     const response = await fetch(`http://localhost:3000/termini/${terminId}/status`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        'Authorization': `Bearer ${token}` // Slanje tokena u headeru
+      },
       body: JSON.stringify(payload)
     });
 
+    if (response.status === 403 || response.status === 401) {
+        // $q.notify je uklonjen odavde
+        userStore.clearUser();
+        router.push('/prijava');
+        return;
+    }
+
     if (response.ok) {
       const data = await response.json();
+      // $q.notify je uklonjen odavde
       console.log("Status uspješno ažuriran:", data.novi_status);
-      fetchTerminiZaVeterinara();
+      fetchTerminiZaVeterinara(); // Osvježi listu termina nakon uspješnog ažuriranja
     } else {
-      console.error("Greška pri ažuriranju termina:", await response.text());
+      const errorData = await response.json();
+      console.error("Greška pri ažuriranju termina:", response.status, response.statusText, errorData.message);
+      // $q.notify je uklonjen odavde
     }
   } catch (error) {
     console.error("Greška pri ažuriranju termina:", error);
+    // $q.notify je uklonjen odavde
   }
 }
 
@@ -180,10 +222,9 @@ onMounted(() => {
 });
 </script>
 
-
-
 <style scoped>
-.termini-page {
+/* Vaši stilovi su preuzeti bez izmjena jer su već dobri */
+.veterinar-termini-page { /* Promijenio sam naziv klase iz .termini-page */
   background-color: white;
 }
 

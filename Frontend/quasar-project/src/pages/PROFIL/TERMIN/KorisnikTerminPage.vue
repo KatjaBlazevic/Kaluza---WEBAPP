@@ -128,6 +128,26 @@
       </q-card>
     </q-dialog>
 
+    <q-dialog v-model="showEditDialog">
+        <q-card style="width: 700px; max-width: 80vw;">
+            <q-card-section>
+                <div class="text-h6">Uredi Termin</div>
+            </q-card-section>
+            <q-card-section class="q-pt-none" v-if="currentTermin">
+                <q-form @submit="submitEditTermin" class="q-gutter-md">
+                    <q-input outlined v-model="currentTermin.datum_termina" label="Datum termina" mask="##.##.####" fill-mask @blur="validateDateFormat" />
+                    <q-input outlined v-model="currentTermin.vrijeme_termina" label="Vrijeme termina" mask="##:##" fill-mask @blur="validateTimeFormat" />
+                    <q-input outlined v-model="currentTermin.simptomi_ljubimca" label="Simptomi ljubimca" type="textarea" rows="3" />
+                    <q-input outlined v-model="currentTermin.razlog_posjete" label="Razlog posjete" type="textarea" rows="2" />
+                    <div class="flex justify-center q-mt-lg">
+                        <q-btn label="Spremi Promjene" type="submit" color="primary" unelevated size="lg" />
+                        <q-btn label="Odustani" color="negative" flat class="q-ml-sm" @click="showEditDialog = false" />
+                    </div>
+                </q-form>
+            </q-card-section>
+        </q-card>
+    </q-dialog>
+
     <q-dialog v-model="showTretmaniDialog">
       <q-card style="width: 700px; max-width: 80vw;">
         <q-card-section>
@@ -178,29 +198,72 @@ const selectedVeterinar = ref(null);
 const veterinariOptions = ref([]);
 const korisnikoviTermini = ref([]);
 const searchQuery = ref('');
-const showAll = ref(false); // Za prikaz više/manje kartica termina
-const showScheduleDialog = ref(false); // Kontrola vidljivosti dialoga za zakazivanje
-const showEditDialog = ref(false); // ✅ Dodano
-const currentTermin = ref(null); // ✅ Dodano za uređivanje termina
+const showAll = ref(false);
+const showScheduleDialog = ref(false);
+const showEditDialog = ref(false);
+const currentTermin = ref(null);
 const prikazaniTretmani = ref([]);
 const showTretmaniDialog = ref(false);
 
+// Helper funkcija za dohvaćanje JWT tokena i postavljanje headera
+function getAuthHeaders() {
+  const token = userStore.token || localStorage.getItem('token'); // Dohvati token iz Pinia store-a ili localStorage-a
+  if (!token) {
+    // Ako nema tokena, preusmjeri na prijavu
+    console.error('Niste prijavljeni. Molimo prijavite se.');
+    alert('Sesija je istekla. Molimo prijavite se ponovno.');
+    userStore.clearUser(); // Očisti store i localStorage
+    router.push('/prijava');
+    return null;
+  }
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}` // Prilagodi za JWT
+  };
+}
+
+// Funkcija za provjeru odgovora i rukovanje 401/403 greškama
+async function handleApiResponse(response) {
+  if (response.status === 401 || response.status === 403) {
+    console.error('Sesija je istekla ili nemate ovlasti. Molimo prijavite se ponovno.');
+    alert('Sesija je istekla ili nemate ovlasti. Molimo prijavite se ponovno.');
+    userStore.clearUser();
+    router.push('/prijava');
+    return false; // Označava da je greška autentifikacije/autorizacije
+  }
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('API Greška:', errorText);
+    alert(`Greška na serveru: ${errorText.substring(0, 100)}...`); // Prikazi dio greške
+    return false; // Označava da je bila neka druga greška
+  }
+  return true; // Označava uspješan odgovor
+}
+
+
 async function fetchUserProfile() {
+  if (!userStore.isAuthenticated) {
+    await userStore.initializeUser(); // Pokušaj inicijalizirati korisnika iz localStorage
+  }
+
+  const headers = getAuthHeaders();
+  if (!headers) return; // Nema tokena, preusmjerenje se već dogodilo
+
   try {
     const res = await fetch('http://localhost:3000/profile', {
-      credentials: 'include'
+      headers: headers // Sada šaljemo JWT
     });
 
-    if (!res.ok) throw new Error('Neuspješno dohvaćanje korisnika.');
+    if (!await handleApiResponse(res)) return; // Provjeri greške
 
     const data = await res.json();
-
     userStore.setUser({
       ...data,
-      SIFRA_KORISNIKA: data.SIFRA_KORISNIKA
+      id: data.SIFRA_KORISNIKA, // Provjerite da li se ID u backendu zove SIFRA_KORISNIKA
     });
   } catch (err) {
     console.error('❌ Greška pri dohvaćanju profila:', err);
+    alert('Greška pri dohvaćanju korisničkog profila.');
   }
 }
 
@@ -221,8 +284,7 @@ function validateDateFormat() {
 }
 
 function convertDateToBackendFormat(date) {
-  if (!date.includes(".")) return date;
-
+  if (!date || !date.includes(".")) return date;
   const [day, month, year] = date.split(".");
   return `${year}-${month}-${day}`;
 }
@@ -230,30 +292,27 @@ function convertDateToBackendFormat(date) {
 function formatDate(date) {
   if (!date) return "";
   const dateObj = new Date(date);
-  return `${dateObj.getDate().toString().padStart(2, '0')}.${(dateObj.getMonth() + 1).toString().padStart(2, '0')}.${dateObj.getFullYear().toString().slice(-2)}`;
+  return `${dateObj.getDate().toString().padStart(2, '0')}.${(dateObj.getMonth() + 1).toString().padStart(2, '0')}.${dateObj.getFullYear()}`; // Puni format godine
 }
 function formatTime(time) {
   if (!time) return "";
   return time.slice(0, 5); // Skida sekunde, prikazuje HH:MM
 }
 
-// Filtriranje termina na temelju unosa u tražilicu
 const filteredTermini = computed(() => {
   const query = searchQuery.value.toLowerCase();
   return korisnikoviTermini.value.filter(t =>
     t.ime_ljubimca.toLowerCase().includes(query) ||
     t.ime_veterinara.toLowerCase().includes(query) ||
-    t.datum_termina.includes(query) ||
+    formatDate(t.datum_termina).includes(query) ||
     t.status_termina.toLowerCase().includes(query) ||
-    t.simptomi_ljubimca.toLowerCase().includes(query) ||
+    (t.simptomi_ljubimca && t.simptomi_ljubimca.toLowerCase().includes(query)) ||
     (t.razlog_posjete && t.razlog_posjete.toLowerCase().includes(query))
   );
 });
 
-// Otvaranje dialoga za zakazivanje
 function openScheduleDialog() {
   showScheduleDialog.value = true;
-  // Opcionalno, resetirajte formu svaki put kada se dialog otvori
   termin.value = {
     datum_termina: '',
     vrijeme_termina: '',
@@ -264,145 +323,130 @@ function openScheduleDialog() {
   selectedVeterinar.value = null;
 }
 
-// 📌 Otvaranje dijaloga za uređivanje termina
-function openEditDialog(termin) {
-  currentTermin.value = { ...termin };
+function openEditDialog(terminData) {
+  currentTermin.value = {
+    ...terminData,
+    datum_termina: formatDate(terminData.datum_termina), // Formatiraj za prikaz u inputu
+    vrijeme_termina: formatTime(terminData.vrijeme_termina)
+  };
   showEditDialog.value = true;
 }
+
 
 async function submitEditTermin() {
   if (!currentTermin.value) {
     console.error('❌ Nema odabranog termina za uređivanje.');
+    alert('Nema odabranog termina za uređivanje.');
     return;
   }
 
-  // ✅ Konvertiraj datum u `YYYY-MM-DD`
-  let datumTermin = currentTermin.value.datum_termina.split("T")[0];
+  const headers = getAuthHeaders();
+  if (!headers) return;
+
+  // Konvertiraj datum u YYYY-MM-DD format za backend
+  const datumZaBackend = convertDateToBackendFormat(currentTermin.value.datum_termina);
 
   try {
     const response = await fetch(`http://localhost:3000/uredi-termin-korisnik/${currentTermin.value.SIFRA_TERMINA}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers: headers,
       body: JSON.stringify({
-        datum_termina: datumTermin, // ✅ Formatiran datum
+        datum_termina: datumZaBackend,
         vrijeme_termina: currentTermin.value.vrijeme_termina,
         simptomi_ljubimca: currentTermin.value.simptomi_ljubimca,
         razlog_posjete: currentTermin.value.razlog_posjete
       })
     });
 
-    if (response.ok) {
-      showEditDialog.value = false;
-      fetchKorisnikoviTermini(); // Osvježi listu termina
-    } else {
-      console.error('❌ Greška pri ažuriranju termina:', await response.text());
-    }
+    if (!await handleApiResponse(response)) return;
+
+    alert('Termin uspješno ažuriran.');
+    showEditDialog.value = false;
+    fetchKorisnikoviTermini();
   } catch (error) {
     console.error('❌ Došlo je do pogreške pri ažuriranju termina:', error);
+    alert('Došlo je do pogreške pri ažuriranju termina.');
   }
 }
 
-// Funkcija za dohvat ljubimaca korisnika
 async function fetchLjubimci() {
+  const headers = getAuthHeaders();
+  if (!headers) return;
+
   try {
     const response = await fetch('http://localhost:3000/moji-ljubimci', {
       method: 'GET',
-      credentials: 'include'
+      headers: headers
     });
-    if (response.ok) {
-      const data = await response.json();
-      ljubimciOptions.value = data.map(lj => ({
-        label: lj.ime_ljubimca,
-        value: lj.SIFRA_LJUBIMCA
-      }));
-    } else if (response.status === 401) {
-      $console.error({
-        type: 'negative',
-        message: 'Niste prijavljeni. Molimo prijavite se.'
-      });
-      router.push('/prijava');
-    } else {
-      console.error({
-        type: 'negative',
-        message: 'Greška pri dohvaćanju ljubimaca: ' + (await response.text())
-      });
-    }
+    if (!await handleApiResponse(response)) return;
+
+    const data = await response.json();
+    ljubimciOptions.value = data.map(lj => ({
+      label: lj.ime_ljubimca,
+      value: lj.SIFRA_LJUBIMCA
+    }));
   } catch (error) {
     console.error('Greška pri dohvaćanju ljubimaca:', error);
-    console.error({
-      type: 'negative',
-      message: 'Došlo je do pogreške prilikom dohvaćanja ljubimaca.'
-    });
+    alert('Došlo je do pogreške prilikom dohvaćanja ljubimaca.');
   }
 }
 
-// Funkcija za dohvat veterinara
 async function fetchVeterinari() {
+  const headers = getAuthHeaders();
+  if (!headers) return;
+
   try {
     const response = await fetch('http://localhost:3000/veterinari', {
       method: 'GET',
-      credentials: 'include'
+      headers: headers
     });
 
-    if (response.ok) {
-      const data = await response.json();
+    if (!await handleApiResponse(response)) return;
 
-      veterinariOptions.value = data.map(vet => ({
-        label: `${vet.ime_veterinara} ${vet.prezime_veterinara} (${vet.specijalizacija_veterinara})`,
-        value: vet.SIFRA_VETERINARA
-      }));
-    } else {
-      console.error('❌ Greška pri dohvaćanju veterinara:', await response.text());
-    }
+    const data = await response.json();
+
+    veterinariOptions.value = data.map(vet => ({
+      label: `${vet.ime_veterinara} ${vet.prezime_veterinara} (${vet.specijalizacija_veterinara})`,
+      value: vet.SIFRA_VETERINARA
+    }));
   } catch (error) {
     console.error('❌ Došlo je do pogreške prilikom dohvaćanja veterinara:', error);
+    alert('Došlo je do pogreške prilikom dohvaćanja veterinara.');
   }
 }
 
 
-// Funkcija za dohvat korisnikovih termina
 async function fetchKorisnikoviTermini() {
+  const headers = getAuthHeaders();
+  if (!headers) return;
+
   try {
-    const response = await fetch('http://localhost:3000/termin', {
+    const response = await fetch('http://localhost:3000/termini', { // Promijenjen endpoint na /termini
       method: 'GET',
-      credentials: 'include'
+      headers: headers
     });
-    if (response.ok) {
-      const data = await response.json();
-      korisnikoviTermini.value = data;
-    } else if (response.status === 401) {
-      console.error({
-        type: 'negative',
-        message: 'Niste prijavljeni. Molimo prijavite se.'
-      });
-      router.push('/prijava');
-    } else {
-      console.error({
-        type: 'negative',
-        message: 'Greška pri dohvaćanju termina: ' + (await response.text())
-      });
-    }
+    if (!await handleApiResponse(response)) return;
+
+    const data = await response.json();
+    korisnikoviTermini.value = data;
   } catch (error) {
     console.error('Greška pri dohvaćanju korisnikovih termina:', error);
-    console.error({
-      type: 'negative',
-      message: 'Došlo je do pogreške prilikom dohvaćanja termina.'
-    });
+    alert('Došlo je do pogreške prilikom dohvaćanja termina.');
   }
 }
 
 async function fetchTretmaniZaTermin(terminId) {
+  const headers = getAuthHeaders();
+  if (!headers) return;
+
   try {
-    const response = await fetch(`http://localhost:3000/tretmani/termin/${terminId}/${userStore.SIFRA_KORISNIKA}`, {
+    // SIFRA_KORISNIKA je uklonjena iz URL-a
+    const response = await fetch(`http://localhost:3000/tretmani/termin/${terminId}`, {
       method: "GET",
-      credentials: "include",
+      headers: headers,
     });
 
-    if (!response.ok) {
-      console.error("Greška pri dohvaćanju tretmana:", await response.text());
-      return;
-    }
+    if (!await handleApiResponse(response)) return;
 
     const data = await response.json();
 
@@ -411,19 +455,22 @@ async function fetchTretmaniZaTermin(terminId) {
 
   } catch (err) {
     console.error("Greška pri dohvaćanju tretmana:", err);
+    alert("Greška pri dohvaćanju tretmana.");
   }
 }
 
 
-
-// Funkcija za slanje termina
 async function submitTermin() {
   if (!selectedLjubimac.value || !selectedVeterinar.value) {
     console.error('❌ Molimo odaberite i ljubimca i veterinara.');
+    alert('Molimo odaberite i ljubimca i veterinara.');
     return;
   }
 
-  // ✅ Inicijaliziraj `payload` odmah na početku funkcije!
+  const headers = getAuthHeaders();
+  if (!headers) return;
+
+  // SIFRA_KORISNIKA je uklonjena iz payload-a jer se dohvaća na backendu iz JWT-a
   const payload = {
     datum_termina: convertDateToBackendFormat(termin.value.datum_termina),
     vrijeme_termina: termin.value.vrijeme_termina,
@@ -431,49 +478,48 @@ async function submitTermin() {
     razlog_posjete: termin.value.razlog_posjete,
     SIFRA_LJUBIMCA: selectedLjubimac.value,
     SIFRA_VETERINARA: selectedVeterinar.value,
-    SIFRA_KORISNIKA: userStore.SIFRA_KORISNIKA
   };
 
   try {
     const response = await fetch('http://localhost:3000/zakazi-termin', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers: headers,
       body: JSON.stringify(payload)
     });
 
-    if (response.ok) {
-      showScheduleDialog.value = false;
-      fetchKorisnikoviTermini(); // Osvježi listu termina
-    } else {
-      console.error('❌ Greška pri zakazivanju termina:', await response.text());
-    }
+    if (!await handleApiResponse(response)) return;
+
+    alert('Termin uspješno zakazan.');
+    showScheduleDialog.value = false;
+    fetchKorisnikoviTermini(); // Osvježi listu termina
   } catch (error) {
     console.error('❌ Došlo je do pogreške prilikom zakazivanja termina:', error);
+    alert('Došlo je do pogreške prilikom zakazivanja termina.');
   }
 }
 
-// Funkcija za otkazivanje termina
 async function cancelTermin(terminId) {
   if (confirm("Jeste li sigurni da želite otkazati ovaj termin?")) {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
     try {
-      const response = await fetch(`http://localhost:3000/otkazi-termin-korisnik/${terminId}`, { // ✅ Ispravan endpoint
+      const response = await fetch(`http://localhost:3000/otkazi-termin-korisnik/${terminId}`, {
         method: 'PUT',
-        credentials: 'include'
+        headers: headers
       });
 
-      if (response.ok) {
-        await fetchKorisnikoviTermini(); // Osvježi listu termina
-      } else {
-        console.error('❌ Greška pri otkazivanju termina:', await response.text());
-      }
+      if (!await handleApiResponse(response)) return;
+
+      alert('Termin uspješno otkazan.');
+      await fetchKorisnikoviTermini(); // Osvježi listu termina
     } catch (error) {
       console.error('❌ Došlo je do pogreške prilikom otkazivanja termina:', error);
+      alert('Došlo je do pogreške prilikom otkazivanja termina.');
     }
   }
 }
 
-// Funkcija za određivanje boje statusa
 function getStatusColor(status) {
   switch (status) {
     case 'Pending': return 'orange';
@@ -484,22 +530,22 @@ function getStatusColor(status) {
   }
 }
 
-// Prikaži više/manje termina
 function toggleShowAll() {
   showAll.value = !showAll.value;
 }
 
 onMounted(() => {
+  // `fetchUserProfile` će također inicijalizirati korisnika iz storea,
+  // što je važno za dohvaćanje tokena.
   fetchUserProfile();
   fetchLjubimci();
   fetchVeterinari();
   fetchKorisnikoviTermini();
 });
-
-
 </script>
 
 <style scoped>
+/* Vaši stilovi ostaju isti */
 .termini-page {
   background-color: white;
 }
@@ -523,7 +569,7 @@ onMounted(() => {
   margin-bottom: 1rem;
 }
 
-.add-termin-btn { /* Promijenjen naziv klase */
+.add-termin-btn {
   background: white !important;
   border-radius: 15px !important;
   padding: 10px 20px !important;
@@ -544,46 +590,45 @@ onMounted(() => {
   margin-top: -60px;
 }
 
-.termini-section { /* Promijenjen naziv klase */
-  background: var(--q-secondary); /* Koristite sekundarnu boju vaše teme */
+.termini-section {
+  background: var(--q-secondary);
   border-radius: 15px;
   padding: 40px;
   margin-bottom: -50px;
   box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
-.termin-card { /* Promijenjen naziv klase */
+.termin-card {
   background: white;
   border-radius: 15px;
   padding: 20px;
   width: 350px;
   text-align: left;
   box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; /* Dodano za hover efekt */
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
-.termin-card:hover { /* Dodano za hover efekt */
+.termin-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
 }
 
-.termin-title { /* Promijenjen naziv klase */
+.termin-title {
   font-size: 1.3rem;
   font-weight: bold;
   line-height: 1.7;
   color: var(--q-dark);
 }
 
-.termin-datetime, .termin-details, .termin-description { /* Promijenjen naziv klase */
+.termin-datetime, .termin-details, .termin-description {
   font-size: 1em;
   color: gray;
 }
 
-.termin-actions .q-btn { /* Promijenjen naziv klase */
+.termin-actions .q-btn {
   min-width: unset;
 }
 
-/* Responsivni stilovi */
 @media (max-width: 1023px) {
   .hero-title {
     font-size: 2rem;

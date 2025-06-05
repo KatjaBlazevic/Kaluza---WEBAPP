@@ -5,7 +5,6 @@
     </div>
 
     <div v-else>
-      <!-- Hero sekcija -->
       <div class="hero-section flex flex-center">
         <div class="hero-content text-center text-white">
           <h1 class="hero-title">
@@ -14,7 +13,6 @@
         </div>
       </div>
 
-      <!-- Glavni sadržaj -->
       <div class="main-content">
         <div class="row justify-center q-gutter-xl q-mb-xl">
           <div class="info-card">
@@ -31,7 +29,7 @@
           </div>
 
           <div class="info-card">
-            <q-icon name="event" size="lg" class="section-icon" />
+            <q-icon name="healing" size="lg" class="section-icon" />
             <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">TRETMANI</h2>
             <q-btn
               unelevated
@@ -44,7 +42,6 @@
           </div>
         </div>
 
-        <!-- Gumb za odjavu -->
         <div class="text-center q-mt-xl">
           <q-btn
             unelevated
@@ -70,20 +67,44 @@ const loading = ref(true)
 const userStore = useUserStore()
 
 async function fetchProfile() {
+  const token = userStore.token;
+
+  if (!token) {
+    router.push('/prijava');
+    loading.value = false;
+    return;
+  }
+
   try {
     const res = await fetch('http://localhost:3000/profile', {
-      credentials: 'include'
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
     });
 
     if (!res.ok) {
+      console.error('Greška pri dohvatu profila:', res.status, res.statusText);
+      userStore.clearUser();
       router.push('/prijava');
       return;
     }
 
     const data = await res.json();
-    userStore.setUser(data);
+    // ✅ KLJUČNA PROMJENA OVDJE:
+    // Backend ruta '/profile' vraća id, ime, prezime, role direktno u 'data' objektu.
+    // Stoga, proslijedite 'data' direktno u setUser zajedno s postojećim tokenom.
+    userStore.setUser({
+        id: data.id,
+        ime: data.ime,
+        prezime: data.prezime,
+        role: data.role,
+        token: token // Proslijedite token koji je već pri ruci
+    });
   } catch (err) {
     console.error('Greška prilikom dohvata profila:', err);
+    userStore.clearUser();
     router.push('/prijava');
   } finally {
     loading.value = false;
@@ -94,7 +115,9 @@ async function logout() {
   try {
     await fetch('http://localhost:3000/logout', {
       method: 'POST',
-      credentials: 'include'
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
     userStore.clearUser();
   } catch (err) {
@@ -103,10 +126,18 @@ async function logout() {
   router.push('/prijava');
 }
 
-onMounted(fetchProfile);
+onMounted(() => {
+  if (!userStore.token) {
+    router.push('/prijava');
+    loading.value = false;
+  } else {
+    fetchProfile();
+  }
+});
 </script>
 
 <style scoped>
+/* Vaš postojeći CSS */
 .profile-page {
   background-color: white;
 }

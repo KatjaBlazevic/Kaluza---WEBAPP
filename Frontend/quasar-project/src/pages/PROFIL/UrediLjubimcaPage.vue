@@ -5,7 +5,7 @@
         <div class="text-h4 ljubimac-title">Uredi ljubimca</div>
       </q-card-section>
 
-      <q-form @submit="spremiIzmjene">
+      <q-form @submit.prevent="spremiIzmjene">
         <q-card-section class="q-gutter-md">
           <q-input v-model="ljubimac.ime_ljubimca" label="Ime ljubimca" filled required />
           <q-select v-model="ljubimac.vrsta_ljubimca" :options="vrste" label="Vrsta ljubimca" filled required />
@@ -19,6 +19,9 @@
           <q-btn label="Spremi izmjene" type="submit" color="primary" />
         </q-card-actions>
       </q-form>
+      <div v-if="statusPoruka" :class="statusBoja === 'green' ? 'text-positive' : 'text-negative'" class="q-mt-md text-center">
+        {{ statusPoruka }}
+      </div>
     </q-card>
   </q-page>
 </template>
@@ -26,47 +29,106 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useUserStore } from '@/stores/user';
 
 const router = useRouter();
 const route = useRoute();
-const loading = ref(true);
-const ljubimac = ref({});
+const userStore = useUserStore();
 
-//Dohvati podatke ljubimca na temelju ID-a
+const ljubimac = ref({});
+const statusPoruka = ref('');
+const statusBoja = ref('');
+
+const vrste = ['Pas', 'Mačka', 'Zec', 'Papiga', 'Zmija', 'Ribica'];
+
 async function fetchLjubimac() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    return;
+  }
+
   try {
     const res = await fetch(`http://localhost:3000/ljubimac/${route.params.id}`, {
-      credentials: 'include'
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
 
-    if (!res.ok) throw new Error('Greška pri dohvaćanju ljubimca.');
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      return;
+    }
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.poruka || 'Greška pri dohvaćanju ljubimca.');
+    }
 
     ljubimac.value = await res.json();
+    // Formatiranje datuma za q-input type="date"
+    if (ljubimac.value.datum_rodenja_ljubimca) {
+      const date = new Date(ljubimac.value.datum_rodenja_ljubimca);
+      ljubimac.value.datum_rodenja_ljubimca = date.toISOString().split('T')[0];
+    }
   } catch (err) {
     console.error('Greška pri dohvaćanju ljubimca:', err);
-  } finally {
-    loading.value = false;
+    statusPoruka.value = err.message;
+    statusBoja.value = 'red';
   }
 }
 
 async function spremiIzmjene() {
-  //Ne šalju se prazni podaci
-  const podaciZaSlanje = {
-    ime_ljubimca: ljubimac.value.ime_ljubimca || '',
-    vrsta_ljubimca: ljubimac.value.vrsta_ljubimca || '',
-    datum_rodenja_ljubimca: ljubimac.value.datum_rodenja_ljubimca || '',
-    kilaza_ljubimca: ljubimac.value.kilaza_ljubimca || '',
-    podaci_o_njezi_ljubimca: ljubimac.value.podaci_o_njezi_ljubimca || '',
-    podaci_o_prehrani_ljubimca: ljubimac.value.podaci_o_prehrani_ljubimca || ''
-  };
+  statusPoruka.value = '';
+  statusBoja.value = '';
 
-  await fetch(`http://localhost:3000/uredi-ljubimca/${route.params.id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(podaciZaSlanje)
-  });
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/prijava');
+    return;
+  }
 
-  router.push('/pregled-ljubimaca');
+  try {
+    const podaciZaSlanje = {
+      ime_ljubimca: ljubimac.value.ime_ljubimca,
+      vrsta_ljubimca: ljubimac.value.vrsta_ljubimca,
+      datum_rodenja_ljubimca: ljubimac.value.datum_rodenja_ljubimca,
+      kilaza_ljubimca: parseFloat(ljubimac.value.kilaza_ljubimca),
+      podaci_o_njezi_ljubimca: ljubimac.value.podaci_o_njezi_ljubimca,
+      podaci_o_prehrani_ljubimca: ljubimac.value.podaci_o_prehrani_ljubimca
+    };
+
+    const res = await fetch(`http://localhost:3000/uredi-ljubimca/${route.params.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(podaciZaSlanje)
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      return;
+    }
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.poruka || 'Greška pri spremanju izmjena.');
+    }
+
+    statusPoruka.value = 'Ljubimac uspješno ažuriran!';
+    statusBoja.value = 'green';
+    router.push('/pregled-ljubimaca'); // Preusmjeri nakon uspješnog ažuriranja
+  } catch (err) {
+    console.error('Greška pri spremanju izmjena:', err);
+    statusPoruka.value = err.message;
+    statusBoja.value = 'red';
+  }
 }
 
 onMounted(fetchLjubimac);
