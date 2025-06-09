@@ -4,6 +4,8 @@ const path = require('path');
 
 module.exports = configure(function (/* ctx */) {
   return {
+    // ... ostale konfiguracije ...
+
     framework: {
       iconSet: 'material-icons',
       config: {
@@ -19,7 +21,9 @@ module.exports = configure(function (/* ctx */) {
           warning: '#F2C037'
         }
       },
-      plugins: []
+      plugins: [
+        'Meta'
+      ]
     },
 
     boot: [
@@ -45,6 +49,27 @@ module.exports = configure(function (/* ctx */) {
         node: 'node20'
       },
       vueRouterMode: 'hash',
+  rawHtmlHead: `
+        <title>Pets&Care</title>
+        <meta name="description" content="Službena web stranica za ljubimce.">
+        <meta name="keywords" content="web development, ljubimci, pets, care, briga, Quasar, veterinari, dogadaji za ljubimce">
+        <meta name="robots" content="index, follow">
+        <link rel="canonical" href="https://www.tvoj-objavljeni-url.com/"> <meta property="og:title" content="Pets&Care">
+        <meta property="og:description" content="Briga za tvoje ljubimce na jednom mjestu!">
+        <meta property="og:image" content="https://www.tvoj-objavljeni-url.com/Pets&Care - logo.svg"> <meta property="og:url" content="https://www.tvoj-objavljeni-url.com/"> <meta property="og:type" content="website">
+        <meta property="og:locale" content="hr_HR">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Pets&Care - Briga za tvoje ljubimce">
+        <meta name="twitter:description" content="Otkrij sve o brizi za ljubimce, veterinarima i događajima na Pets&Care!">
+        <meta name="twitter:image" content="https://www.tvoj-objavljeni-url.com/Pets&Care - logo.svg"> <script async src="https://www.googletagmanager.com/gtag/js?id=G-H4CDCPX6WL"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-H4CDCPX6WL'); // <-- VAŽNO: ZAMIJENI OVO SVOJIM STVARNIM GA4 MEASUREMENT ID-JEM (npr. G-ABCDE12345)
+        </script>
+      `,
       vitePlugins: [
         ['@intlify/vite-plugin-vue-i18n', {
           include: path.resolve(__dirname, './src/i18n/**')

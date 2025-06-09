@@ -27,8 +27,8 @@
         <div class="col-12 col-md-5">
           <div class="kontakt-info bg-grey-2 q-pa-lg rounded-borders text-center">
             <div class="kontakt-naslov text-h6 q-mb-md">Možete nas kontaktirati i putem:</div>
-            <p class="q-mb-sm"><q-icon name="email" class="q-mr-sm" /> info@petscare.hr</p>
-            <p class="q-mb-sm"><q-icon name="phone" class="q-mr-sm" /> +385 91 123 4567</p>
+            <p class="q-mb-sm"><q-icon name="email" class="q-mr-sm" /> petsncarecroatia@gmail.com</p>
+            <p class="q-mb-sm"><q-icon name="phone" class="q-mr-sm" /> +385 99 309 4904</p>
             <p class="q-mb-sm"><q-icon name="place" class="q-mr-sm" /> Ulica Ljubimaca 5, Rijeka</p>
           </div>
         </div>

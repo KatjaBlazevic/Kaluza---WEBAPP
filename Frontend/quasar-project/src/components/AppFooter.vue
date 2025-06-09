@@ -5,15 +5,12 @@
     :class="{ 'footer-visible': isFooterVisible }"
   >
     <div class="footer-content">
-      <!-- Desktop layout -->
       <div class="row gt-sm items-center justify-between q-px-xl q-py-md">
-        <!-- Lijeva kolona - Logo -->
         <div class="col-3">
           <div class="text-subtitle2 q-mb-xs">Pets&Care</div>
           <div class="text-caption">Sve za vašeg ljubimca na jednom mjestu</div>
         </div>
 
-        <!-- Srednja kolona - Navigacija -->
         <div class="col-6 text-center">
           <div class="text-subtitle2 q-mb-xs">Navigacija</div>
           <div class="row justify-center q-gutter-sm">
@@ -29,18 +26,21 @@
           </div>
         </div>
 
-        <!-- Desna kolona - Društvene mreže -->
         <div class="col-3 text-right">
           <div class="text-subtitle2 q-mb-xs">Pratite nas</div>
           <div class="row justify-end q-gutter-xs">
-            <q-btn round dense icon="facebook" size="sm" />
-            <q-btn round dense icon="instagram" size="sm" />
-            <q-btn round dense icon="twitter" size="sm" />
+            <q-btn
+              round
+              dense
+              icon="facebook"
+              size="sm"
+              href="https://www.facebook.com/share/1AUL2LnL3D/?mibextid=wwXIfr"
+              target="_blank"
+            />
           </div>
         </div>
       </div>
 
-      <!-- Mobile layout -->
       <div class="column lt-md items-center q-pa-md">
         <div class="text-subtitle2 q-mb-sm">Navigacija</div>
         <div class="row q-gutter-sm q-mb-sm">
@@ -56,9 +56,14 @@
         </div>
         <div class="text-subtitle2 q-mb-xs">Pratite nas</div>
         <div class="row q-gutter-sm q-mb-md">
-          <q-btn round dense icon="facebook" size="sm" />
-          <q-btn round dense icon="instagram" size="sm" />
-          <q-btn round dense icon="twitter" size="sm" />
+          <q-btn
+            round
+            dense
+            icon="facebook"
+            size="sm"
+            href="https://www.facebook.com/share/1AUL2LnL3D/?mibextid=wwXIfr"
+            target="_blank"
+          />
         </div>
         <div class="text-caption text-center">
           © {{ new Date().getFullYear() }} Pets&Care
