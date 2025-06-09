@@ -44,6 +44,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'; // ✅ Uvezi userStore
 
 const username = ref('')
 const lozinka = ref('')
@@ -51,36 +52,58 @@ const loading = ref(false)
 const errorMsg = ref('')
 
 const router = useRouter()
+const userStore = useUserStore(); // ✅ Inicijaliziraj userStore
 
 const submitLogin = async () => {
-  loading.value = true
-  errorMsg.value = ''
+  loading.value = true;
+  errorMsg.value = '';
 
   try {
     const res = await fetch('http://localhost:3000/prijava', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',  // OVO JE KLJUČNO za slanje sesijskog cookieja
       body: JSON.stringify({
         username: username.value,
         lozinka: lozinka.value
       })
-    })
+    });
 
-    const data = await res.json()
+    const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.message || 'Neispravni podaci za prijavu.')
+      throw new Error(data.message || 'Neispravni podaci za prijavu.');
     }
 
-    // Nema tokena, samo redirect jer je sesija postavljena na backendu
-    router.push('/profile')
+    // 📌 Backend bi trebao vratiti i podatke o korisniku uz token (id, role, ime, prezime)
+    // Vaš backend vraća: { message, token, user: { id, role, ime, prezime } }
+    // Tako da data.user sadrži potrebne informacije
+
+    // Ažuriraj Pinia store s podacima korisnika i tokenom
+    userStore.setUser({
+        id: data.user.id,
+        ime: data.user.ime,
+        prezime: data.user.prezime,
+        role: data.user.role,
+        token: data.token // Proslijedi i token storeu
+    });
+
+    // Nakon što je store ažuriran, preusmjeri na odgovarajuću stranicu
+    if (userStore.role === 'admin') { // Koristi userStore.role za provjeru uloge
+        router.push('/admin');
+    } else if (userStore.role === 'veterinar') {
+        router.push('/profile-veterinar'); // ✅ Provjerite putanju za veterinara! (U vašem kodu ste imali /profile-veterinar, u mojim prijedlozima /veterinar-profile. Koristite ono što ste definirali u routeru.)
+    } else if (userStore.role === 'korisnik') {
+        router.push('/profile');
+    }
+
   } catch (err) {
-    errorMsg.value = err.message
+    errorMsg.value = err.message;
+    // Očisti korisničke podatke u store-u u slučaju greške pri prijavi
+    userStore.clearUser();
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 </script>
 

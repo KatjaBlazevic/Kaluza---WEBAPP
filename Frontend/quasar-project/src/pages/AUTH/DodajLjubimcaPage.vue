@@ -55,28 +55,41 @@ const pet = ref({
 const vrste = ['Pas', 'Mačka', 'Zec', 'Papiga', 'Zmija', 'Ribica']
 
 const statusPoruka = ref('')
-const statusBoja = ref('') // 'green' za uspjeh, 'red' za grešku
+const statusBoja = ref('')
 
-// Dohvati profil korisnika prilikom učitavanja stranice
 const fetchUserProfile = async () => {
   try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/prijava');
+      return;
+    }
+
     const res = await fetch('http://localhost:3000/profile', {
-      credentials: 'include'
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
     });
 
-    if (!res.ok) throw new Error('Neuspješno dohvaćanje korisnika.');
+    if (!res.ok) {
+      localStorage.removeItem('token');
+      userStore.clearUser();
+      router.push('/prijava');
+      throw new Error('Neuspješno dohvaćanje korisnika ili nevažeći token.');
+    }
 
     const data = await res.json();
-    console.log('Dohvaćen korisnik:', data); // Debug konzola
+    userStore.setUser(data);
 
-    userStore.setUser({
-      ...data,
-      SIFRA_KORISNIKA: data.SIFRA_KORISNIKA // Osiguraj da postoji ispravno
-    });
   } catch (err) {
-    console.error('Greška pri dohvaćanju profila:', err);
+    console.error('Greška pri dohvaćanju profila za DodajLjubimca:', err);
     statusPoruka.value = 'Greška pri dohvaćanju korisničkog profila.';
     statusBoja.value = 'red';
+    localStorage.removeItem('token');
+    userStore.clearUser();
+    router.push('/prijava');
   }
 };
 
@@ -96,10 +109,11 @@ function resetForm() {
 }
 
 async function submitPet() {
-  if (!userStore.SIFRA_KORISNIKA) {
-    console.error('Greška: Korisnik nije prijavljen ili nema SIFRA_KORISNIKA.');
-    statusPoruka.value = 'Greška: Korisnik nije prijavljen.';
+  if (!userStore.id) {
+    console.error('Greška: Korisnik nije prijavljen ili ID korisnika nije dostupan u storeu.');
+    statusPoruka.value = 'Greška: Korisnik nije prijavljen ili ID nije dostupan. Pokušajte se ponovno prijaviti.';
     statusBoja.value = 'red';
+    router.push('/prijava');
     return;
   }
 
@@ -111,13 +125,20 @@ async function submitPet() {
       kilaza_ljubimca: parseFloat(pet.value.kilaza),
       podaci_o_njezi_ljubimca: pet.value.njega,
       podaci_o_prehrani_ljubimca: pet.value.prehrana,
-      SIFRA_KORISNIKA: userStore.SIFRA_KORISNIKA
+      SIFRA_KORISNIKA: userStore.id
     };
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+        throw new Error('Nema JWT tokena za autorizaciju prilikom dodavanja ljubimca.');
+    }
 
     const res = await fetch('http://localhost:3000/ljubimci', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(podaciZaLjubimca)
     });
 
@@ -134,16 +155,19 @@ async function submitPet() {
     console.error('Greška pri dodavanju ljubimca:', e);
     statusPoruka.value = e.message;
     statusBoja.value = 'red';
+    if (e.message.includes('token') || e.message.includes('autorizaciju')) {
+        localStorage.removeItem('token');
+        userStore.clearUser();
+        router.push('/prijava');
+    }
   }
 }
-
 </script>
 
 <style scoped>
 .ljubimac-title{
-    color: var(--q-primary);
+  color: var(--q-primary);
   font-weight: bold;
-text-align: center;
+  text-align: center;
 }
-
 </style>
