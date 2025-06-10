@@ -62,8 +62,8 @@ const authenticateToken = (req, res, next) => {
 };
 
 
-// REGISTRACIJA (1. KORAK REGISTRACIJE)
-app.post('/registracija', async (req, res) => { // Promijenio sam u async jer koristimo await
+// REGISTRACIJA (1. KORAK REGISTRACIJE) - AŽURIRANO ZA VIŠESTUPANJSKU REGISTRACIJU
+app.post('/registracija', async (req, res) => {
     const { ime, prezime, email, lozinka } = req.body;
 
     if (!ime || !prezime || !email || !lozinka) {
@@ -76,37 +76,11 @@ app.post('/registracija', async (req, res) => { // Promijenio sam u async jer ko
     `;
 
     try {
-        const [insertResult] = await db.promise().query(insertSql, [ime, prezime, email, lozinka]); // Koristi await
+        const [insertResult] = await db.promise().query(insertSql, [ime, prezime, email, lozinka]);
 
-        const [userResults] = await db.promise().query(`
-            SELECT SIFRA_KORISNIKA, email_korisnika, ime_korisnika, prezime_korisnika, nadimak_korisnika
-            FROM Korisnik
-            WHERE SIFRA_KORISNIKA = ?
-        `, [insertResult.insertId]); // Koristi insertId za dohvat korisnika
-
-        if (userResults.length === 0) {
-            return res.status(500).json({ message: 'Greška prilikom dohvaćanja novoregistriranog korisnika.' });
-        }
-
-        const newUser = userResults[0];
-
-        // ✅ Generiranje JWT tokena za novoregistriranog korisnika
-        const token = jwt.sign(
-            {
-                id: newUser.SIFRA_KORISNIKA,
-                role: 'korisnik', // Uloga je uvijek 'korisnik' za ovu registraciju
-                ime: newUser.ime_korisnika,
-                prezime: newUser.prezime_korisnika
-                // Ovdje možeš dodati i nadimak ako ga želiš u tokenu, npr. nadimak: newUser.nadimak_korisnika
-            },
-            SECRET_KEY,
-            { expiresIn: '1h' }
-        );
-
-        // Umjesto sesije, šaljemo JWT token
         res.status(201).json({
-            message: 'Registracija uspješna. Korisnik je prijavljen.',
-            token: token // Šaljemo token frontendu
+            message: 'Registracija uspješna. Nastavite na izradu profila.',
+            userId: insertResult.insertId 
         });
 
     } catch (err) {
@@ -118,17 +92,16 @@ app.post('/registracija', async (req, res) => { // Promijenio sam u async jer ko
     }
 });
 
-/// IZRADA PROFILA (2. KORAK REGISTRACIJE)
+// /// IZRADA PROFILA (2. KORAK REGISTRACIJE)
 app.put('/izrada-profila', (req, res) => {
     const {
-        email, 
+        userId, 
         nadimak,
         adresa,
         mjesto,
         datumRodenja,
         brojTelefona
     } = req.body;
-
 
     const sql = `
         UPDATE Korisnik
@@ -138,10 +111,10 @@ app.put('/izrada-profila', (req, res) => {
             mjesto_stanovanja = ?,
             datum_rodenja = ?,
             broj_telefona_korisnika = ?
-        WHERE email_korisnika = ?
+        WHERE SIFRA_KORISNIKA = ?
     `;
 
-    db.query(sql, [nadimak, adresa, mjesto, datumRodenja, brojTelefona, email], (err, result) => {
+    db.query(sql, [nadimak, adresa, mjesto, datumRodenja, brojTelefona, userId], (err, result) => {
         if (err) {
             console.error('Greška prilikom ažuriranja korisnika:', err);
             return res.status(500).json({ error: 'Greška u bazi podataka' });
@@ -150,7 +123,7 @@ app.put('/izrada-profila', (req, res) => {
     });
 });
 
-//IZRADA PROFILA ZA LJUBIMCA (3. KORAK REGISTRACIJE)
+// IZRADA PROFILA ZA LJUBIMCA (3. KORAK REGISTRACIJE) - AŽURIRANO
 app.post('/ljubimci', async (req, res) => {
     const { ime_ljubimca, vrsta_ljubimca, datum_rodenja_ljubimca, kilaza_ljubimca, podaci_o_njezi_ljubimca, podaci_o_prehrani_ljubimca, SIFRA_KORISNIKA } = req.body;
 
@@ -159,12 +132,12 @@ app.post('/ljubimci', async (req, res) => {
     }
 
     try {
-        const sql = `
+        // 1. Spremi ljubimca u bazu
+        const insertLjubimacSql = `
             INSERT INTO Ljubimac (ime_ljubimca, vrsta_ljubimca, datum_rodenja_ljubimca, kilaza_ljubimca, podaci_o_njezi_ljubimca, podaci_o_prehrani_ljubimca, SIFRA_KORISNIKA)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
-
-        const [result] = await db.promise().query(sql, [
+        const [result] = await db.promise().query(insertLjubimacSql, [
             ime_ljubimca,
             vrsta_ljubimca,
             datum_rodenja_ljubimca,
@@ -174,9 +147,51 @@ app.post('/ljubimci', async (req, res) => {
             SIFRA_KORISNIKA
         ]);
 
-        res.status(201).json({ poruka: 'Ljubimac je uspješno dodan.', id: result.insertId });
+        // 2. Dohvati sve potrebne podatke o korisniku (za token)
+        const [userResults] = await db.promise().query(`
+            SELECT SIFRA_KORISNIKA, email_korisnika, ime_korisnika, prezime_korisnika, nadimak_korisnika
+            FROM Korisnik
+            WHERE SIFRA_KORISNIKA = ?
+        `, [SIFRA_KORISNIKA]);
+
+        if (userResults.length === 0) {
+            // Ovo bi se rijetko trebalo dogoditi ako je SIFRA_KORISNIKA validna iz prethodnih koraka
+            return res.status(404).json({ poruka: 'Korisnik nije pronađen nakon dodavanja ljubimca.' });
+        }
+
+        const registeredUser = userResults[0];
+
+        // 3. Generiraj JWT token
+        const token = jwt.sign(
+            {
+                id: registeredUser.SIFRA_KORISNIKA,
+                role: 'korisnik',
+                ime: registeredUser.ime_korisnika,
+                prezime: registeredUser.prezime_korisnika,
+                email: registeredUser.email_korisnika, // Dodaj email u token ako ti treba na frontendu
+                nadimak: registeredUser.nadimak_korisnika // Dodaj nadimak u token ako ti treba na frontendu
+            },
+            SECRET_KEY, // Provjeri da SECRET_KEY postoji i da je dostupan ovdje
+            { expiresIn: '1h' }
+        );
+
+        // 4. Pošalji odgovor s tokenom i korisničkim podacima
+        res.status(201).json({
+            poruka: 'Ljubimac je uspješno dodan. Registracija je dovršena. Korisnik je prijavljen.',
+            token: token,
+            user: {
+                id: registeredUser.SIFRA_KORISNIKA,
+                role: 'korisnik',
+                ime: registeredUser.ime_korisnika,
+                prezime: registeredUser.prezime_korisnika,
+                email: registeredUser.email_korisnika,
+                nadimak: registeredUser.nadimak_korisnika
+            },
+            ljubimacId: result.insertId
+        });
+
     } catch (err) {
-        console.error('Greška u SQL query-u:', err.message);
+        console.error('Greška u SQL query-u za ljubimca ili generiranje tokena:', err.message);
         res.status(500).json({ poruka: 'Greška na serveru.', detalji: err.message });
     }
 });

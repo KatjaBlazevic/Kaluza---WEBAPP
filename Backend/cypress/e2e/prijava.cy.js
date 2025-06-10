@@ -53,7 +53,7 @@ describe("Prijava korisnika - acceptance testovi", () => {
     );
   });
  
-  it("❌ Neuspješna prijava s pogrešnom lozinkom", () => {
+  it("Neuspješna prijava s pogrešnom lozinkom", () => {
     cy.request({
       method: "POST",
       url: `${baseUrl}/prijava`,
@@ -65,7 +65,7 @@ describe("Prijava korisnika - acceptance testovi", () => {
     });
   });
  
-  it("❌ Prijava bez podataka vraća 400", () => {
+  it("Prijava bez podataka vraća 400", () => {
     cy.request({
       method: "POST",
       url: `${baseUrl}/prijava`,

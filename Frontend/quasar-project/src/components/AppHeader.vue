@@ -16,6 +16,13 @@
       <div class="header-right gt-sm">
         <q-btn
           flat
+          icon="help_outline"
+          href="/prirucnik.pdf"
+          target="_blank"
+          class="text-button"
+        />
+        <q-btn
+          flat
           label="Moj profil"
           :to="userStore.role === 'veterinar' ? '/profile-veterinar' : userStore.role === 'admin' ? '/admin' : '/profile'"
           class="text-button"
@@ -68,6 +75,18 @@
           </q-item>
 
           <q-separator color="white" class="q-my-sm" />
+
+          <q-item
+            clickable
+            v-ripple
+            href="/prirucnik.pdf"
+            target="_blank"
+            class="text-white q-my-xs"
+            @click="toggleLeftDrawer"
+          >
+            <q-item-section>Pomoć</q-item-section>
+          </q-item>
+
           <q-item
             clickable
             v-ripple
@@ -125,7 +144,6 @@ const getUserRole = () => {
 
 getUserRole();
 
-
 const links = [
   { label: 'Početna', to: '/' },
   { label: 'O nama', to: '/about' },
@@ -146,7 +164,6 @@ const logout = () => {
   }
 };
 </script>
-
 
 <style scoped>
 .header-toolbar {
@@ -170,6 +187,7 @@ const logout = () => {
 
 .header-right {
   display: flex;
+  gap: 12px;
   justify-self: end;
 }
 

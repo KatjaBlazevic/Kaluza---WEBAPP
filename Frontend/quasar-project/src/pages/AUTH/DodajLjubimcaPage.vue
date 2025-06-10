@@ -36,12 +36,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import { ref } from 'vue'; // Uklonjen onMounted jer ne dohvaćamo profil ovdje
+import { useRoute, useRouter } from 'vue-router'; // Dodan useRoute
+import { useUserStore } from '@/stores/user';
 
-const router = useRouter()
-const userStore = useUserStore()
+const router = useRouter();
+const userStore = useUserStore();
+const route = useRoute(); // Inicijaliziraj useRoute
+
+// ✅ Dohvaćanje userId iz query parametra
+const userId = ref(route.query.userId || null);
+
+// Ako userId nije prisutan, nešto je pošlo po zlu u prethodnom koraku
+if (!userId.value) {
+  console.error('Greška: ID korisnika nije pronađen u URL-u za dodavanje ljubimca.');
+  // Preusmjeri korisnika natrag na početak registracije ili prijavu
+  router.replace('/registracija'); // Ili na /prijava
+}
 
 const pet = ref({
   ime: '',
@@ -50,50 +61,16 @@ const pet = ref({
   kilaza: '',
   njega: '',
   prehrana: ''
-})
+});
 
-const vrste = ['Pas', 'Mačka', 'Zec', 'Papiga', 'Zmija', 'Ribica']
+const vrste = ['Pas', 'Mačka', 'Zec', 'Papiga', 'Zmija', 'Ribica'];
 
-const statusPoruka = ref('')
-const statusBoja = ref('')
+const statusPoruka = ref('');
+const statusBoja = ref('');
 
-const fetchUserProfile = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/prijava');
-      return;
-    }
-
-    const res = await fetch('http://localhost:3000/profile', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!res.ok) {
-      localStorage.removeItem('token');
-      userStore.clearUser();
-      router.push('/prijava');
-      throw new Error('Neuspješno dohvaćanje korisnika ili nevažeći token.');
-    }
-
-    const data = await res.json();
-    userStore.setUser(data);
-
-  } catch (err) {
-    console.error('Greška pri dohvaćanju profila za DodajLjubimca:', err);
-    statusPoruka.value = 'Greška pri dohvaćanju korisničkog profila.';
-    statusBoja.value = 'red';
-    localStorage.removeItem('token');
-    userStore.clearUser();
-    router.push('/prijava');
-  }
-};
-
-onMounted(fetchUserProfile);
+// ❌ UKLONJENA fetchUserProfile i onMounted(fetchUserProfile)
+// Jer se JWT token generira tek u ovom koraku, nakon spremanja ljubimca.
+// Korisnik još nije "prijavljen" na frontendu.
 
 function resetForm() {
   pet.value = {
@@ -103,17 +80,19 @@ function resetForm() {
     kilaza: '',
     njega: '',
     prehrana: ''
-  }
-  statusPoruka.value = ''
-  statusBoja.value = ''
+  };
+  statusPoruka.value = '';
+  statusBoja.value = '';
 }
 
 async function submitPet() {
-  if (!userStore.id) {
-    console.error('Greška: Korisnik nije prijavljen ili ID korisnika nije dostupan u storeu.');
-    statusPoruka.value = 'Greška: Korisnik nije prijavljen ili ID nije dostupan. Pokušajte se ponovno prijaviti.';
+  // ✅ Koristi userId iz query parametra, NE iz userStore-a
+  if (!userId.value) {
+    console.error('Greška: ID korisnika nedostaje za dodavanje ljubimca.');
+    statusPoruka.value = 'Greška: ID korisnika nedostaje. Molimo pokušajte ponovno.';
     statusBoja.value = 'red';
-    router.push('/prijava');
+    // Opcionalno, preusmjeri na početak registracije
+    router.push('/registracija');
     return;
   }
 
@@ -125,47 +104,53 @@ async function submitPet() {
       kilaza_ljubimca: parseFloat(pet.value.kilaza),
       podaci_o_njezi_ljubimca: pet.value.njega,
       podaci_o_prehrani_ljubimca: pet.value.prehrana,
-      SIFRA_KORISNIKA: userStore.id
+      SIFRA_KORISNIKA: userId.value // ✅ Prosljeđujemo userId s prethodnih koraka
     };
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-        throw new Error('Nema JWT tokena za autorizaciju prilikom dodavanja ljubimca.');
-    }
-
+    // ❌ Nema potrebe za tokenom za ovaj POST zahtjev, backend ga tek generira
     const res = await fetch('http://localhost:3000/ljubimci', {
       method: 'POST',
       headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+        'Content-Type': 'application/json',
+        // 'Authorization': `Bearer ${token}` // ❌ UKLONJENO - token se generira na backendu u ovom koraku
       },
       body: JSON.stringify(podaciZaLjubimca)
     });
 
+    const data = await res.json(); // Uvijek parsiraj JSON odgovor
+
     if (!res.ok) {
-      const data = await res.json();
       throw new Error(data.poruka || 'Greška pri dodavanju ljubimca.');
     }
 
-    statusPoruka.value = 'Ljubimac uspješno dodan!';
+    statusPoruka.value = data.poruka; // Poruka s backenda
     statusBoja.value = 'green';
     resetForm();
-    router.push('/profile');
+
+    // ✅ OVDJE POHRANI TOKEN I KORISNIKA U STORE
+    if (data.token && data.user) {
+      localStorage.setItem('token', data.token);
+      userStore.setUser(data.user); // userStore.setUser očekuje objekt s id, ime, prezime, role, email, nadimak
+      console.log('Korisnik uspješno prijavljen nakon registracije i dodavanja ljubimca!');
+      router.push('/profile'); // ✅ Preusmjeri na profil nakon uspješne prijave
+    } else {
+      // Ako backend nije vratio token/user (što ne bi trebao biti slučaj prema našem planu)
+      statusPoruka.value = 'Ljubimac dodan, ali nije moguće automatski prijaviti korisnika.';
+      statusBoja.value = 'red';
+      router.push('/prijava'); // Ako se ne može prijaviti automatski, neka se prijavi ručno
+    }
+
   } catch (e) {
     console.error('Greška pri dodavanju ljubimca:', e);
     statusPoruka.value = e.message;
     statusBoja.value = 'red';
-    if (e.message.includes('token') || e.message.includes('autorizaciju')) {
-        localStorage.removeItem('token');
-        userStore.clearUser();
-        router.push('/prijava');
-    }
+
   }
 }
 </script>
 
 <style scoped>
-.ljubimac-title{
+.ljubimac-title {
   color: var(--q-primary);
   font-weight: bold;
   text-align: center;

@@ -39,21 +39,22 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user';
-const userStore = useUserStore(); // Pretpostavljam da imaš user store
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+// import { useUserStore } from '@/stores/user'; // ❌ NE TREBA NAM USER STORE ZA 1. KORAK REGISTRACIJE
 
-const ime = ref('')
-const prezime = ref('')
-const email = ref('')
-const lozinka = ref('')
+// const userStore = useUserStore(); // ❌ UKLONI OVO
 
-const loading = ref(false)
-const successMsg = ref('')
-const errorMsg = ref('')
+const ime = ref('');
+const prezime = ref('');
+const email = ref('');
+const lozinka = ref('');
 
-const router = useRouter()
+const loading = ref(false);
+const successMsg = ref('');
+const errorMsg = ref('');
+
+const router = useRouter();
 
 const submitRegistration = async () => {
   loading.value = true;
@@ -64,7 +65,6 @@ const submitRegistration = async () => {
     const res = await fetch('http://localhost:3000/registracija', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // ⚠️ UKLONJENO: credentials: 'include' - više ne koristimo sesije
       body: JSON.stringify({
         ime: ime.value,
         prezime: prezime.value,
@@ -81,31 +81,30 @@ const submitRegistration = async () => {
 
     successMsg.value = data.message;
 
-    // ✅ POHRANA JWT TOKENA: Backend sada šalje token u 'data.token'
-    localStorage.setItem('token', data.token);
+    // ❌ UKLONI OVE LINIJE KOJE RADE S TOKENOM I USER STORE-OM
+    // localStorage.setItem('token', data.token);
+    // const decodedToken = JSON.parse(atob(data.token.split('.')[1]));
+    // userStore.setUser({
+    //   id: decodedToken.id,
+    //   ime: decodedToken.ime,
+    //   prezime: decodedToken.prezime,
+    //   role: decodedToken.role
+    // });
 
-    // ✅ DEKODIRANJE TOKENA: Da bi dobio user podatke (id, ime, prezime, rolu)
-    // Tvoj 'userStore' očekuje objekt s 'id', 'ime', 'prezime', 'role'
-    const decodedToken = JSON.parse(atob(data.token.split('.')[1]));
-
-    // Pohrani korisnika u store
-    userStore.setUser({
-      id: decodedToken.id,
-      ime: decodedToken.ime,
-      prezime: decodedToken.prezime,
-      role: decodedToken.role
-      // Dodaj i druge podatke iz tokena ako ih koristiš u store-u, npr. email: decodedToken.email
-    });
-
-    // Automatski preusmjeri korisnika na izradu profila
-    // ✅ PROSLJEĐIVANJE EMAILA: Email i dalje proslijeđuješ kao query parametar za 2. korak
-    router.push({ path: '/izrada-profila', query: { email: email.value } });
+    // ✅ KLJUČNA PROMJENA: Preusmjeri na izradu profila i proslijedi userId
+    // Backend sada vraća userId, ne token za prijavu
+    if (data.userId) {
+      router.push({ path: '/izrada-profila', query: { userId: data.userId } });
+    } else {
+      // Ako iz nekog razloga backend ne vrati userId, javi grešku
+      errorMsg.value = 'Registracija uspješna, ali ID korisnika nije primljen. Molimo pokušajte ponovno prijavu.';
+    }
 
   } catch (err) {
     errorMsg.value = err.message;
-    // Opcionalno, obriši token ako postoji, jer registracija nije uspjela
-    localStorage.removeItem('token');
-    userStore.clearUser(); // Očisti store
+    // Očisti poruku o uspjehu ako je greška
+    successMsg.value = '';
+    // userStore.clearUser(); // ❌ UKLONI OVO ako userStore nije ni korišten
   } finally {
     loading.value = false;
   }

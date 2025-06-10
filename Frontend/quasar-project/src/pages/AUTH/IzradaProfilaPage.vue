@@ -35,58 +35,72 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
-const route = useRoute()
-const router = useRouter()
+const route = useRoute();
+const router = useRouter();
 
-// Email dohvaćen iz query parametra
-const email = route.query.email
+// ✅ userId mora biti dohvaćen, i osiguraj da postoji prije nego što nastaviš
+const userId = route.query.userId;
 
-const nadimak = ref('')
-const adresa = ref('')
-const mjesto = ref('')
-const datumRodenja = ref('')
-const brojTelefona = ref('')
+// Ako userId ne postoji, preusmjeri odmah natrag
+if (!userId) {
+  console.error('IzradaProfilaPage: ID korisnika nije pronađen u URL-u, preusmjeravam na registraciju.');
+  router.replace('/register'); // ILI /registracija ako ti je tako ruta definirana
+}
 
-const loading = ref(false)
-const successMsg = ref('')
-const errorMsg = ref('')
+const nadimak = ref('');
+const adresa = ref('');
+const mjesto = ref('');
+const datumRodenja = ref('');
+const brojTelefona = ref('');
+
+const loading = ref(false);
+const successMsg = ref('');
+const errorMsg = ref('');
 
 const submitProfile = async () => {
-  loading.value = true
-  successMsg.value = ''
-  errorMsg.value = ''
+  loading.value = true;
+  successMsg.value = '';
+  errorMsg.value = '';
 
   try {
     const response = await fetch('http://localhost:3000/izrada-profila', {
-      method: 'PUT',
+      method: 'PUT', // Ako ažuriraš, PUT je prikladniji. Ako kreiraš, POST.
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email,
+        userId: userId, // Koristimo userId iz query parametra
         nadimak: nadimak.value,
         adresa: adresa.value,
         mjesto: mjesto.value,
         datumRodenja: datumRodenja.value,
         brojTelefona: brojTelefona.value
       })
-    })
+    });
 
     if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.message || 'Greška prilikom ažuriranja profila.')
+      const data = await response.json();
+      throw new Error(data.message || 'Greška prilikom ažuriranja profila.');
     }
 
-//Preusmjeri na treću fazu registracije
-    successMsg.value = 'Profil uspješno ažuriran!'
-    setTimeout(() => router.push('/dodaj-ljubimca'), 1000)
+    // Backend za /izrada-profila NE MORA vratiti userId, jer ga već imamo.
+    // Jednostavno ga proslijedimo dalje.
+    successMsg.value = 'Profil uspješno ažuriran!';
+    console.log('IzradaProfilaPage: Profil ažuriran. Preusmjeravam na /dodaj-ljubimca s userId:', userId);
+
+    // ✅ KLJUČNA PROMJENA: Prosljeđujemo userId u query parametru
+    setTimeout(() => {
+      router.push({ path: '/dodaj-ljubimca', query: { userId: userId } });
+    }, 500);
+
   } catch (err) {
-    errorMsg.value = err.message || 'Greška prilikom slanja podataka.'
+    console.error('IzradaProfilaPage: Greška pri ažuriranju profila:', err);
+    errorMsg.value = err.message || 'Greška prilikom slanja podataka.';
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 </script>
 
 <style scoped>
@@ -94,10 +108,10 @@ const submitProfile = async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center; /* Centrirano na ekranu */
-  min-height: 100vh; /* Osigurava da stranica zauzima cijeli ekran */
+  justify-content: center;
+  min-height: 100vh;
 }
-.izradaprofila-title{
+.izradaprofila-title {
   color: var(--q-primary);
   font-weight: bold;
   text-align: center;
