@@ -473,7 +473,7 @@ onMounted(() => {
 
 .hero-section {
   height: 70vh;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)), url('hero_pocetna.avif'); /* Provjerite putanju slike */
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)), url('/hero_onama.png'); /* Provjerite putanju slike */
   background-size: cover;
   background-position: center;
   color: white;

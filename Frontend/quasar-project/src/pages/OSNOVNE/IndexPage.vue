@@ -101,7 +101,7 @@
 
 .hero-section {
   height: 70vh;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)),url('hero_pocetna.avif');
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)),url('/hero_pocetna.avif');
   background-size: cover;
   background-position: center;
   color: white;

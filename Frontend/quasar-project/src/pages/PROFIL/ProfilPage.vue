@@ -163,10 +163,8 @@ async function fetchProfile() {
 
 async function logout() {
   try {
-    // ⚠️ ISPRAVKA 2: Ukloni credentials: 'include' i ne treba ti fetch zahtjev za logout ako je samo JWT.
-    // Dovoljno je obrisati token iz localStorage.
-    localStorage.removeItem('token'); // Briše token iz localStorage
-    userStore.clearUser(); // Briše korisničke podatke iz storea
+    localStorage.removeItem('token');
+    userStore.clearUser();
   } catch (err) {
     console.error('Greška prilikom odjave:', err);
     // Iako ovdje neće biti greške, zadržavamo catch blok za dosljednost
@@ -189,7 +187,7 @@ onMounted(fetchProfile);
       rgba(0, 0, 0, 0.6),
       rgba(0, 0, 0, 0.9)
     ),
-    url('hero_pocetna.avif');
+    url('/hero_pocetna.avif');
   background-size: cover;
   background-position: center;
   color: white;

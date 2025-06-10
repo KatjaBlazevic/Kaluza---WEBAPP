@@ -15,12 +15,12 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// ✅ CORS postavke – dopuštamo frontend aplikaciji slanje tokena
+
 app.use(cors({
-  origin: 'http://localhost:9000', // ✅ Vaš frontend URL (provjerite je li to 9000, a ne npr. 8080)
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // ✅ Dozvoljene HTTP metode
-  allowedHeaders: ['Content-Type', 'Authorization'], // ✅ OVO JE NAJVAŽNIJE ZA JWT! Dozvoli Authorization header
-  credentials: true // ✅ Dozvoli slanje kolačića (cookies) i HTTP autentifikacijskih headera (Authorization)
+  origin: 'http://localhost:9000', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'], 
+  credentials: true 
 }));
 
 // 🔹 Povezivanje s bazom
@@ -1503,10 +1503,12 @@ app.post('/dogadaji', (req, res) => {
   });
 });
 
-// VETERINARI
 app.get('/veterinari', (req, res) => {
   db.query('SELECT * FROM Veterinar', (err, results) => {
-    if (err) return res.status(500).json(err);
+    if (err) {
+      console.error('❌ Greška u bazi:', err);
+      return res.status(500).json({ poruka: 'Greška na serveru', detalji: err.message });
+    }
     res.json(results);
   });
 });
@@ -1736,5 +1738,4 @@ function closeServer() {
   });
 }
 
-// VAŽNO: Izvozi 'db' konekciju kako bi bila dostupna za closeServer funkciju
 module.exports = { app, closeServer, db };

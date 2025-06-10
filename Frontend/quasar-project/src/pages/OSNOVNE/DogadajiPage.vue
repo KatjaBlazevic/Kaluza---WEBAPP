@@ -157,7 +157,7 @@ watch(selectedEvent, updateMap);
 /* Hero sekcija */
 .hero-section {
   height: 70vh;
-   background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.8)), url('hero_dogadaji.jpg');
+   background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.8)), url('/hero_dogadaji.jpg');
   background-size: cover;
   background-position: center;
   color: white;

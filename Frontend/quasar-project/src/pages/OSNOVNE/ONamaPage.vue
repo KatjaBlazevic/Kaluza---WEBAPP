@@ -47,9 +47,11 @@
         <div class="col-12 col-md-6 order-2 text-left">
           <h2 class="section-title mobile-center">Tko smo mi?</h2>
           <p class="section-text mobile-center">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam sed lacinia dui.
-            Nunc finibus, nibh viverra lobortis posuere, lacus ipsum viverra eros, eget ullamcorper
-            nibh velit in nibh. Suspendisse felis massa, iaculis non bibendum vitae.
+            Pets&Care je zajednica koja povezuje ljubitelje životinja s ciljem stvaranja sigurnog, podržavajućeg i
+            inspirativnog okruženja za vlasnike i njihove ljubimce.
+            <br><br>
+             Naša strast prema brizi o životinjama vodi nas u stvaranju prostora gdje svi mogu pronaći razumijevanje,
+             dijeliti iskustva i osjećati se kao dio nečeg većeg. Uz nas, tvoji ljubimci dobivaju pažnju koju zaslužuju.
           </p>
         </div>
       </div>
@@ -68,7 +70,7 @@
 /* Hero sekcija */
 .hero-section {
   height: 70vh;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)), url('hero_onama.png');
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 1)), url('/hero_onama.png');
   background-size: cover;
   background-position: center;
   color: white;
