@@ -9,10 +9,7 @@
       </div>
     </div>
 
-    <!-- Sekcija 1 - Misija -->
-    <div class="section-container">
-      <div class="section-content row items-center justify-between">
-        <!-- Tekst - na mobilnom prvi -->
+    <div class="section-container" data-testid="misija-section"> <div class="section-content row items-center justify-between">
         <div class="col-12 col-md-6 order-2 order-md-1 text-right">
           <h2 class="section-title mobile-center">Naša misija</h2>
           <p class="section-text mobile-center">
@@ -21,7 +18,6 @@
             događajima i uslugama u njihovoj blizini.
           </p>
         </div>
-        <!-- Slika - na mobilnom druga -->
         <div class="col-12 col-md-5 order-1 order-md-2">
           <q-img
             src="~assets/misija.jpg"
@@ -32,10 +28,7 @@
       </div>
     </div>
 
-    <!-- Sekcija 2 - Tko smo mi -->
-    <div class="section-container">
-      <div class="section-content row items-center justify-between">
-        <!-- Slika - na mobilnom druga -->
+    <div class="section-container" data-testid="tko-smo-mi-section"> <div class="section-content row items-center justify-between">
         <div class="col-12 col-md-5 order-1">
           <q-img
             src="~assets/tim-slika.jpg"
@@ -43,15 +36,14 @@
             :ratio="16/9"
           />
         </div>
-        <!-- Tekst - na mobilnom prvi -->
         <div class="col-12 col-md-6 order-2 text-left">
           <h2 class="section-title mobile-center">Tko smo mi?</h2>
           <p class="section-text mobile-center">
             Pets&Care je zajednica koja povezuje ljubitelje životinja s ciljem stvaranja sigurnog, podržavajućeg i
             inspirativnog okruženja za vlasnike i njihove ljubimce.
             <br><br>
-             Naša strast prema brizi o životinjama vodi nas u stvaranju prostora gdje svi mogu pronaći razumijevanje,
-             dijeliti iskustva i osjećati se kao dio nečeg većeg. Uz nas, tvoji ljubimci dobivaju pažnju koju zaslužuju.
+              Naša strast prema brizi o životinjama vodi nas u stvaranju prostora gdje svi mogu pronaći razumijevanje,
+              dijeliti iskustva i osjećati se kao dio nečeg većeg. Uz nas, tvoji ljubimci dobivaju pažnju koju zaslužuju.
           </p>
         </div>
       </div>

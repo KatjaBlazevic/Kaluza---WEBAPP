@@ -1,6 +1,5 @@
 <template>
   <q-page class="index-page">
-    <!-- Hero sekcija -->
     <div class="hero-section flex flex-center">
       <div class="hero-content text-center text-white">
         <h1 class="hero-title">Briga za tvoje ljubimce na jednom mjestu</h1>
@@ -16,13 +15,9 @@
       </div>
     </div>
 
-    <!-- Glavni sadržaj -->
     <div class="main-content">
-      <!-- Tri kartice -->
       <div class="row justify-center q-gutter-xl q-mb-xl">
-        <!-- O nama -->
-        <div class="info-card">
-          <q-icon name="pets" size="lg" class="section-icon" />
+        <div class="info-card" data-testid="about-card"> <q-icon name="pets" size="lg" class="section-icon" />
           <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">O NAMA</h2>
           <p class="q-mb-md text-dark">
             Saznajte više o nama<br>
@@ -38,9 +33,7 @@
           />
         </div>
 
-        <!-- Pridruži se -->
-        <div class="info-card">
-          <q-icon name="group_add" size="lg" class="section-icon" />
+        <div class="info-card" data-testid="join-card"> <q-icon name="group_add" size="lg" class="section-icon" />
           <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">PRIDRUŽI SE</h2>
           <p class="q-mb-md text-dark">
             Registrirajte se i <br>
@@ -56,9 +49,7 @@
           />
         </div>
 
-        <!-- Dogadaji -->
-        <div class="info-card">
-          <q-icon name="event" size="lg" class="section-icon" />
+        <div class="info-card" data-testid="events-card"> <q-icon name="event" size="lg" class="section-icon" />
           <h2 class="text-h5 q-mt-sm q-mb-sm text-dark">DOGADAJI</h2>
           <p class="q-mb-md text-dark">
             Otkrijte nadolazeće<br>
@@ -75,7 +66,6 @@
         </div>
       </div>
 
-      <!-- Čuvalica sekcija -->
       <div class="text-center q-mt-xl">
         <q-btn
           unelevated
